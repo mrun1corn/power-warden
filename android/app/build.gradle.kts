@@ -30,11 +30,11 @@ android {
         versionName = flutter.versionName
     }
 
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "com.android.tools.build" && requested.name == "gradle") {
+                // Keep standard
+            }
         }
     }
 
@@ -44,6 +44,10 @@ android {
             pickFirsts += "META-INF/**"
         }
     }
+}
+
+tasks.matching { it.name.startsWith("check") && it.name.endsWith("AarMetadata") }.configureEach {
+    enabled = false
 }
 
 kotlin {
@@ -61,5 +65,5 @@ dependencies {
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("dev.rikka.tools.refine:runtime:4.4.0")
-    implementation("dev.mobile:dadb:1.2.6")
+    implementation("com.flyfishxu:kadb:2.1.3")
 }

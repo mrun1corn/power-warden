@@ -67,19 +67,12 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     /**
-     * Connects or pairs via local wireless debugging ADB endpoint on localhost.
+     * Executes real SPAKE2 TLS pairing protocol with Android Wireless Debugging.
      */
     suspend fun pairKadb(port: Int, code: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            // First verify socket connectivity to the target port
-            val socket = java.net.Socket()
-            socket.connect(java.net.InetSocketAddress("127.0.0.1", port), 3000)
-            socket.close()
-
-            // Connect using dadb client
-            val dadb = dadb.Dadb.create("127.0.0.1", port)
-            val resp = dadb.shell("echo ping")
-            resp.exitCode == 0
+            com.flyfishxu.kadb.Kadb.pair("127.0.0.1", port, code)
+            true
         } catch (_: Exception) {
             false
         }
