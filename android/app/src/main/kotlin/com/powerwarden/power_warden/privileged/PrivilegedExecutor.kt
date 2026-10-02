@@ -109,6 +109,43 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     /**
+     * Retrieves the top active processes with CPU and memory resource consumption.
+     */
+    suspend fun getTopProcesses(): List<Map<String, Any>> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<Map<String, Any>>()
+        try {
+            val res = executeCommand("top -b -n 1 -m 15")
+            val lines = res.stdout.lines()
+
+            for (line in lines) {
+                val tokens = line.trim().split("\\s+".toRegex())
+                // Typical top line on Android: PID USER PR NI VIRT RES SHR S [%CPU] [%MEM] TIME+ ARGS
+                if (tokens.size >= 9 && tokens[0].all { it.isDigit() }) {
+                    val pid = tokens[0]
+                    val cpuStr = tokens.find { it.endsWith("%") || it.toDoubleOrNull() != null } ?: "0"
+                    val pkgName = tokens.last()
+
+                    // Filter out kernel threads like [ksoftirqd]
+                    if (!pkgName.startsWith("[") && pkgName.contains(".")) {
+                        val cpuPercent = cpuStr.replace("%", "").toDoubleOrNull() ?: 0.0
+                        list.add(
+                            mapOf(
+                                "pid" to pid,
+                                "packageName" to pkgName,
+                                "cpuPercent" to cpuPercent,
+                                "name" to pkgName.substringAfterLast(".")
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Fallback or sorted by CPU
+        list.sortedByDescending { (it["cpuPercent"] as? Double) ?: 0.0 }.take(10)
+    }
+
+    /**
      * Differential delta snapshot: Captures top thread stats, waits delayMs, captures second snapshot,
      * and computes CPU tick differential.
      */

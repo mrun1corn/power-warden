@@ -75,6 +75,43 @@ class TelemetryService {
     }
   }
 
+  Future<bool> startMdnsDiscovery() async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('startMdnsDiscovery');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> stopMdnsDiscovery() async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('stopMdnsDiscovery');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<int> getDiscoveredPort() async {
+    try {
+      final res = await _methodChannel.invokeMethod<int>('getDiscoveredPort');
+      return res ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getRunningProcesses() async {
+    try {
+      final res = await _methodChannel.invokeListMethod<dynamic>('getRunningProcesses');
+      if (res != null) {
+        return res.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
   Future<bool> pairKadb(int port, String code) async {
     try {
       final res = await _methodChannel.invokeMethod<bool>('pairKadbLocal', {

@@ -23,6 +23,8 @@ class MainActivity : FlutterActivity() {
     private lateinit var thermalObserver: ThermalObserver
     private lateinit var screenObserver: ScreenObserver
     private lateinit var privilegedExecutor: PrivilegedExecutor
+    private lateinit var mdnsDiscovery: com.powerwarden.power_warden.privileged.AdbMdnsDiscovery
+    private lateinit var pairingNotificationHelper: com.powerwarden.power_warden.service.PairingNotificationHelper
 
     private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var eventSink: EventChannel.EventSink? = null
@@ -34,6 +36,24 @@ class MainActivity : FlutterActivity() {
         thermalObserver = ThermalObserver(this) {}
         screenObserver = ScreenObserver(this) { _, _ -> }
         privilegedExecutor = PrivilegedExecutor(this)
+        mdnsDiscovery = com.powerwarden.power_warden.privileged.AdbMdnsDiscovery(this)
+        pairingNotificationHelper = com.powerwarden.power_warden.service.PairingNotificationHelper(this)
+
+        mdnsDiscovery.onPairingPortDiscovered = { port ->
+            pairingNotificationHelper.showPairingNotification(port)
+        }
+
+        com.powerwarden.power_warden.service.PairingNotificationHelper.onCodeReceivedListener = { code ->
+            val port = mdnsDiscovery.discoveredPairingPort
+            if (port != null) {
+                activityScope.launch {
+                    val ok = privilegedExecutor.pairKadb(port, code)
+                    if (ok) {
+                        pairingNotificationHelper.dismiss()
+                    }
+                }
+            }
+        }
 
         thermalObserver.start()
         screenObserver.start()
@@ -82,6 +102,19 @@ class MainActivity : FlutterActivity() {
                     startService(intent)
                     result.success(true)
                 }
+                "startMdnsDiscovery" -> {
+                    mdnsDiscovery.startDiscovery()
+                    pairingNotificationHelper.showPairingNotification(mdnsDiscovery.discoveredPairingPort)
+                    result.success(true)
+                }
+                "stopMdnsDiscovery" -> {
+                    mdnsDiscovery.stopDiscovery()
+                    pairingNotificationHelper.dismiss()
+                    result.success(true)
+                }
+                "getDiscoveredPort" -> {
+                    result.success(mdnsDiscovery.discoveredPairingPort ?: 0)
+                }
                 "getElevatedBackendStatus" -> {
                     val hasShizuku = privilegedExecutor.isShizukuAvailable()
                     val hasPerm = privilegedExecutor.hasShizukuPermission()
@@ -110,6 +143,12 @@ class MainActivity : FlutterActivity() {
                     activityScope.launch {
                         val ok = privilegedExecutor.pairKadb(port, code)
                         result.success(ok)
+                    }
+                }
+                "getRunningProcesses" -> {
+                    activityScope.launch {
+                        val procs = privilegedExecutor.getTopProcesses()
+                        result.success(procs)
                     }
                 }
                 "runDeltaDiagnostics" -> {

@@ -32,6 +32,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, bool> _elevatedStatus = {'hasShizuku': false, 'hasPermission': false, 'hasKadb': false};
   bool _isProMode = false;
 
+  List<Map<String, dynamic>> _topProcesses = [];
+  bool _isLoadingProcesses = false;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +46,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _elevatedStatus = await _telemetryService.getElevatedStatus();
     _currentSample = await _telemetryService.getInstantMetrics();
     await _telemetryService.startForegroundService();
+    _loadProcesses();
 
     // Listen to live stream
     _streamSub = _telemetryService.telemetryStream.listen((sample) {
@@ -66,6 +70,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void dispose() {
     _streamSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadProcesses() async {
+    setState(() => _isLoadingProcesses = true);
+    final procs = await _telemetryService.getRunningProcesses();
+    if (mounted) {
+      setState(() {
+        _topProcesses = procs;
+        _isLoadingProcesses = false;
+      });
+    }
   }
 
   void _showPairingModal() {
@@ -153,6 +168,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 16),
                     _buildHumanDiagnosisCard(sample),
                     const SizedBox(height: 16),
+                    _buildProcessUsageSection(),
+                    const SizedBox(height: 16),
                   ] else ...[
                     // --- PRO DIAGNOSTICS VIEW ---
                     CurrentGauge(
@@ -174,6 +191,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: 16),
                     DrainTimelineChart(samples: _history),
+                    const SizedBox(height: 16),
+
+                    // Top Active Processes / Resource Eaters Section
+                    _buildProcessUsageSection(),
                     const SizedBox(height: 16),
                   ],
 
@@ -254,6 +275,135 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  /// App resource and energy drainers list
+  Widget _buildProcessUsageSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.apps_rounded, size: 16, color: AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            const Text(
+              'ACTIVE APP ENERGY CONSUMPTION',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.0,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const Spacer(),
+            if (_isLoadingProcesses)
+              const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentGreen))
+            else
+              InkWell(
+                onTap: _loadProcesses,
+                child: const Text('Refresh', style: TextStyle(color: AppTheme.chargingCyan, fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_topProcesses.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.surfaceBorder),
+            ),
+            child: const Center(
+              child: Text(
+                'No heavy apps consuming active CPU cycles.\nTap refresh or authorize Shizuku for deep inspection.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+              ),
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.surfaceBorder),
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _topProcesses.length,
+              separatorBuilder: (_, _) => Divider(height: 1, color: AppTheme.surfaceBorder.withOpacity(0.5)),
+              itemBuilder: (context, idx) {
+                final proc = _topProcesses[idx];
+                final name = (proc['name'] as String?) ?? 'App';
+                final pkg = (proc['packageName'] as String?) ?? '';
+                final cpu = (proc['cpuPercent'] as num?)?.toDouble() ?? 0.0;
+                final isHeavy = cpu > 10.0;
+
+                return ListTile(
+                  dense: true,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isHeavy ? AppTheme.crimson.withOpacity(0.15) : AppTheme.surfaceVariant,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.android_rounded,
+                      size: 16,
+                      color: isHeavy ? AppTheme.crimson : AppTheme.textSecondary,
+                    ),
+                  ),
+                  title: Text(
+                    name.toUpperCase(),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  subtitle: Text(
+                    pkg,
+                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isHeavy ? AppTheme.crimson.withOpacity(0.2) : AppTheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${cpu.toStringAsFixed(1)}% CPU',
+                          style: TextStyle(
+                            color: isHeavy ? AppTheme.crimson : AppTheme.accentGreen,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 16, color: AppTheme.textSecondary),
+                        tooltip: 'Force Stop',
+                        onPressed: () async {
+                          await _telemetryService.remediateApp(pkg);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Tamed $name')),
+                            );
+                            _loadProcesses();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 

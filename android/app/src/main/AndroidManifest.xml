@@ -20,6 +20,14 @@
             android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
+        <receiver
+            android:name=".service.PairingNotificationHelper$CodeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.powerwarden.action.PAIRING_CODE_SUBMITTED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".service.PowerWardenService"
             android:foregroundServiceType="specialUse"
