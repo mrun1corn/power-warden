@@ -49,9 +49,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _telemetryService.startForegroundService();
     _loadProcesses();
 
-    // Auto-refresh active energy consumers every 5 seconds
-    _processRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted) _loadProcesses();
+    // Auto-refresh active energy consumers and elevated state every 5 seconds
+    _processRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (mounted) {
+        _loadProcesses();
+        final s = await _telemetryService.getElevatedStatus();
+        if (s['hasPermission'] != _elevatedStatus['hasPermission'] ||
+            s['hasShizuku'] != _elevatedStatus['hasShizuku']) {
+          setState(() => _elevatedStatus = s);
+        }
+      }
     });
 
     // Listen to live stream

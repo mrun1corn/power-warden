@@ -42,7 +42,8 @@ class PrivilegedExecutor(private val context: Context) {
      */
     fun isShizukuAvailable(): Boolean {
         return try {
-            Shizuku.pingBinder()
+            val binder = Shizuku.getBinder()
+            binder != null && binder.isBinderAlive && Shizuku.pingBinder()
         } catch (_: Exception) {
             false
         }
@@ -53,7 +54,9 @@ class PrivilegedExecutor(private val context: Context) {
      */
     fun hasShizukuPermission(): Boolean {
         return try {
-            if (Shizuku.isPreV11()) {
+            if (!isShizukuAvailable()) {
+                false
+            } else if (Shizuku.isPreV11()) {
                 false
             } else {
                 Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED

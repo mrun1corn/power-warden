@@ -58,6 +58,13 @@ class MainActivity : FlutterActivity() {
         thermalObserver.start()
         screenObserver.start()
 
+        // Ensure notification permission on Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2001)
+            }
+        }
+
         // Hook background service listener into EventSink
         PowerWardenService.listener = { sample ->
             activityScope.launch {
@@ -101,6 +108,23 @@ class MainActivity : FlutterActivity() {
                     }
                     startService(intent)
                     result.success(true)
+                }
+                "openWirelessDebuggingSettings" -> {
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        try {
+                            val intent = Intent(android.provider.Settings.ACTION_SETTINGS)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (_: Exception) {
+                            result.success(false)
+                        }
+                    }
                 }
                 "startMdnsDiscovery" -> {
                     mdnsDiscovery.startDiscovery()

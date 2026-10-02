@@ -207,23 +207,171 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                     ),
                     dividerColor: Colors.transparent,
                     tabs: const [
-                      Tab(text: 'Shizuku (1-Tap)'),
-                      Tab(text: 'Wireless ADB (Auto)'),
+                      Tab(text: 'Wireless ADB (Kadb)'),
+                      Tab(text: 'Shizuku API'),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
-                  height: 280,
+                  height: 310,
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      // Tab 1: Shizuku
+                      // Tab 1: Wireless ADB (Auto mDNS + Redirect Button + Notification Reply)
+                      SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.chargingCyan.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppTheme.chargingCyan.withOpacity(0.3)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.notifications_active_rounded, color: AppTheme.chargingCyan, size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _discoveredPort > 0
+                                              ? 'Port Auto-Detected: $_discoveredPort'
+                                              : 'Searching for port on Wi-Fi via mDNS...',
+                                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    '1. Tap the button below to jump straight to Developer Settings.\n2. Tap "Pair device with pairing code".\n3. Swipe down notification shade to enter the 6-digit code without switching apps!',
+                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, height: 1.4),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 36,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => _telemetryService.openWirelessDebuggingSettings(),
+                                      icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                                      label: const Text('Open Wireless Debugging Settings', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.chargingCyan,
+                                        foregroundColor: Colors.black,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: TextField(
+                                    controller: _portController,
+                                    focusNode: _portFocus,
+                                    keyboardType: TextInputType.number,
+                                    textInputAction: TextInputAction.next,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(5),
+                                    ],
+                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                    decoration: InputDecoration(
+                                      labelText: 'Port',
+                                      labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                                      hintText: _discoveredPort > 0 ? '$_discoveredPort' : '37755',
+                                      hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                                      filled: true,
+                                      fillColor: AppTheme.surfaceVariant,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                    ),
+                                    onSubmitted: (_) => _codeFocus.requestFocus(),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 3,
+                                  child: TextField(
+                                    controller: _codeController,
+                                    focusNode: _codeFocus,
+                                    keyboardType: TextInputType.number,
+                                    textInputAction: TextInputAction.done,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(6),
+                                    ],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 2.0,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: '6-Digit Code',
+                                      labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                                      hintText: '123456',
+                                      hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12, letterSpacing: 0),
+                                      filled: true,
+                                      fillColor: AppTheme.surfaceVariant,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                    ),
+                                    onSubmitted: (_) => _handleKadbPair(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 38,
+                              child: ElevatedButton.icon(
+                                onPressed: _isPairingKadb ? null : _handleKadbPair,
+                                icon: _isPairingKadb
+                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                                    : const Icon(Icons.wifi_tethering_rounded, size: 16),
+                                label: Text(
+                                  _isPairingKadb ? 'Pairing...' : 'Pair Manually in App',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.surfaceVariant,
+                                  foregroundColor: Colors.white,
+                                  side: const BorderSide(color: AppTheme.surfaceBorder),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                            ),
+                            if (_kadbMessage != null) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                _kadbMessage!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: _kadbMessage!.startsWith('✓') ? AppTheme.accentGreen : AppTheme.crimson,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      // Tab 2: Shizuku
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Shizuku is the easiest: it binds once through system Binder and never loses permission when switching apps.',
+                            'Shizuku binds permanently via Android Binder IPC. Once allowed, permissions survive app switches and phone locks.',
                             style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
                           ),
                           const SizedBox(height: 14),
@@ -294,128 +442,6 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                             ),
                           ],
                         ],
-                      ),
-
-                      // Tab 2: Wireless ADB (Auto mDNS + Notification Reply)
-                      SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppTheme.chargingCyan.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppTheme.chargingCyan.withOpacity(0.3)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.notifications_active_rounded, color: AppTheme.chargingCyan, size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _discoveredPort > 0
-                                          ? 'Port Auto-Detected: $_discoveredPort!\nSwipe down notification to type code without leaving Settings.'
-                                          : 'Searching for port on Wi-Fi via mDNS...\nTurn on Wireless Debugging in Settings.',
-                                      style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.3),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: TextField(
-                                    controller: _portController,
-                                    focusNode: _portFocus,
-                                    keyboardType: TextInputType.number,
-                                    textInputAction: TextInputAction.next,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                      LengthLimitingTextInputFormatter(5),
-                                    ],
-                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                    decoration: InputDecoration(
-                                      labelText: 'Port',
-                                      labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                                      hintText: _discoveredPort > 0 ? '$_discoveredPort' : 'e.g. 37755',
-                                      hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
-                                      filled: true,
-                                      fillColor: AppTheme.surfaceVariant,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                                    ),
-                                    onSubmitted: (_) => _codeFocus.requestFocus(),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  flex: 3,
-                                  child: TextField(
-                                    controller: _codeController,
-                                    focusNode: _codeFocus,
-                                    keyboardType: TextInputType.number,
-                                    textInputAction: TextInputAction.done,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                      LengthLimitingTextInputFormatter(6),
-                                    ],
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 2.0,
-                                    ),
-                                    decoration: InputDecoration(
-                                      labelText: '6-Digit Code',
-                                      labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                                      hintText: '123456',
-                                      hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12, letterSpacing: 0),
-                                      filled: true,
-                                      fillColor: AppTheme.surfaceVariant,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                                    ),
-                                    onSubmitted: (_) => _handleKadbPair(),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 38,
-                              child: ElevatedButton.icon(
-                                onPressed: _isPairingKadb ? null : _handleKadbPair,
-                                icon: _isPairingKadb
-                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                                    : const Icon(Icons.wifi_tethering_rounded, size: 16),
-                                label: Text(
-                                  _isPairingKadb ? 'Pairing...' : 'Pair Now',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.chargingCyan,
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                              ),
-                            ),
-                            if (_kadbMessage != null) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                _kadbMessage!,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: _kadbMessage!.startsWith('✓') ? AppTheme.accentGreen : AppTheme.crimson,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
                       ),
                     ],
                   ),
