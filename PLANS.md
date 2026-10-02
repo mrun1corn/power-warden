@@ -1,84 +1,109 @@
-# PowerWarden — Implementation & Development Plans
+# PowerWarden — MVP Engineering Roadmap & Execution Plan
 
-## Overview
-This document outlines the phased roadmap for building **PowerWarden** from native hardware telemetry probing to differential delta diagnostic profiling, Shizuku & Kadb integration, and a reactive Flutter dashboard.
-
----
-
-## Phase 1: Native Android Hardware Telemetry Bridge (Kotlin)
-- [ ] **1.1 Battery Hardware Interface (`BatteryProbe.kt`):**
-  - Sample `BatteryManager.BATTERY_PROPERTY_CURRENT_NOW` with dynamic $\mu A$ vs $mA$ scaling.
-  - Implement sign normalization: positive discharge current ($mA$), negative charging current ($mA$).
-  - 3-point rolling median filter to suppress cellular/modem bursts.
-  - Read battery temperature and voltage via `Intent.ACTION_BATTERY_CHANGED`.
-- [ ] **1.2 Thermal & Throttling Observers (`ThermalObserver.kt`):**
-  - Register `PowerManager.OnThermalStatusChangedListener` (Android 10+ / API 29).
-  - Map `THERMAL_STATUS_NONE` through `THERMAL_STATUS_CRITICAL` to standardized severity levels.
-- [ ] **1.3 Screen State Ingestion (`ScreenStateReceiver.kt`):**
-  - Register dynamic `BroadcastReceiver` for `Intent.ACTION_SCREEN_ON` and `Intent.ACTION_SCREEN_OFF`.
-  - Maintain a state machine tracking exact duration of screen-off sleep windows.
-- [ ] **1.4 Foreground Service (`PowerWardenService.kt`):**
-  - Implement an Android foreground service with `specialUse` type (Android 14/15 compliant).
-  - Adaptive Zero-Wake ticker: relax during nominal idle (15–60mA), tighten during drain spikes.
-  - Ensure sample execution completes within $<10ms$ CPU time.
-  - Expose `MethodChannel` (`com.powerwarden/telemetry`) and `EventChannel` (`com.powerwarden/telemetry_stream`).
+> **Goal:** Ship a rock-solid, production-grade MVP that solves silent Android battery drain without root or a PC, maintaining $<0.3\%$ daily overhead, zero jank, and a refined Material 3 UI.
 
 ---
 
-## Phase 2: Anomaly Engine & Incident Profiler (Dart / Kotlin)
-- [ ] **2.1 Baseline Profiling:**
-  - Auto-learn device idle baseline current consumption ($50\text{–}120mA$ on standard Android flagships).
-- [ ] **2.2 Screen-Off Drain Detector:**
-  - If `screen_state == OFF` and `current_ma > 450mA` across 3 consecutive cycles:
-    - Escalate to `WARNING_RUNAWAY_DRAIN`.
-  - If sustained for $>10$ minutes with elevated thermal status ($>38^\circ\text{C}$):
-    - Escalate to `CRITICAL_RUNAWAY_DRAIN`.
-- [ ] **2.3 Differential Snapshotting Engine:**
-  - On anomaly trigger: Capture Snapshot A (`top`, `dumpsys batterystats --wake-locks`), wait 5 seconds, capture Snapshot B, diff active threads and unreleased wakelocks.
-- [ ] **2.4 Notification Dispatcher:**
-  - Dispatch actionable local notifications with culprit package/thread and direct one-tap fix buttons.
+## 🎯 MVP Scope & Core Pillars
+
+| Pillar | Target Specification |
+| :--- | :--- |
+| **Features** | Auto-calibrated live $mA$ current, screen-off drain sentinel, differential delta snapshotting ($top$ + wakelocks), one-tap Shizuku/ADB remediation, and translated diagnoses. |
+| **Performance** | $<10\text{ms}$ CPU time per sample, zero continuous wakelocks (deep sleep preserved), 15-minute batched SQLite transactions, 60/120 FPS UI. |
+| **Code Quality** | Clean layered architecture (Repository pattern), exhaustive unit tests for parsers/calibration, zero memory leaks, robust error handling across OEMs. |
+| **UI / UX** | Material 3 Dark theme (OLED true black `#000000`), fluid animated gauges, clean `fl_chart` drain timeline, clear human-readable diagnoses instead of raw logs. |
 
 ---
 
-## Phase 3: Rootless Elevated Diagnostics (Shizuku + Kadb)
-- [ ] **3.1 Shizuku Integration:**
-  - Integrate `dev.rikka.shizuku:api:13.1.5` and `dev.rikka.shizuku:provider:13.1.5`.
-  - Check binder availability, handle one-time permission request, execute privileged commands.
-- [ ] **3.2 In-App Kadb (Direct Wireless ADB Client):**
-  - Integrate `com.flyfishxu:kadb:2.1.4`.
-  - In-app pairing flow for Android 11+ Wireless Debugging over loopback (`127.0.0.1`).
-  - Auto-reconnect via mDNS port discovery.
-- [ ] **3.3 Privileged Remediator:**
-  - One-tap "Tame App": Execute `am force-stop <package>` or `cmd appops set <package> RUN_IN_BACKGROUND ignore`.
-  - Identify system loops vs third-party apps to recommend reboots vs app kills.
+## 🛠️ Detailed Phased Implementation
+
+### Phase 1: Native Telemetry Core & OEM Normalization (Kotlin)
+*Focus: Performance & Robustness*
+- [ ] **1.1 Battery Probe (`BatteryProbe.kt`):**
+  - Read `BATTERY_PROPERTY_CURRENT_NOW` with dynamic auto-scaling:
+    - If $|raw| < 10,000$, treat as $mA$; if $|raw| \ge 10,000$, divide by $1,000$ to get $mA$.
+  - Enforce sign standard: positive = discharge ($mA$), negative = charging ($mA$).
+  - 3-point rolling median filter over 300ms to eliminate cellular transmission ping artifacts.
+  - Read voltage ($mV$) and temperature ($^\circ C$) from sticky `ACTION_BATTERY_CHANGED`.
+- [ ] **1.2 Thermal & Screen Observers (`ThermalObserver.kt`, `ScreenObserver.kt`):**
+  - Register `PowerManager.OnThermalStatusChangedListener` (API 29+).
+  - Register dynamic `BroadcastReceiver` for `ACTION_SCREEN_ON` and `ACTION_SCREEN_OFF`.
+  - Track duration of screen-off sleep windows accurately across device Doze cycles.
+- [ ] **1.3 Compliant Foreground Service (`PowerWardenService.kt`):**
+  - Android 14/15 `specialUse` foreground service type with low-priority non-intrusive notification.
+  - Adaptive Zero-Wake ticker:
+    - Normal idle ($15\text{–}60mA$): Inexact 10-15 min wake intervals (let Linux kernel enter suspend).
+    - Drain spike ($>350mA$ screen-off): Tighten to 30s diagnostics.
+  - Guarantee sample execution completes within $\le 10\text{ ms}$ CPU wake budget.
+- [ ] **1.4 Platform Channels (`TelemetryChannel.kt`):**
+  - `MethodChannel` (`com.powerwarden/telemetry`) for on-demand metrics and service control.
+  - `EventChannel` (`com.powerwarden/telemetry_stream`) for live HUD updates.
 
 ---
 
-## Phase 4: Flutter User Interface & Analytics
-- [ ] **4.1 Architecture & Persistence:**
-  - Scaffold Flutter project structure (Material 3).
-  - Set up `Drift` / `SQLite` database to persist historical battery samples and drain events with a 48h rolling prune.
-- [ ] **4.2 Real-time Dashboard:**
-  - Live discharge current gauge / dial ($mA$).
-  - Temperature meter, voltage readout, and thermal throttle badge.
-  - Elevated status badge (Shizuku / Kadb active).
-- [ ] **4.3 Historical Drain Charts:**
-  - Time-series chart (`fl_chart`) plotting:
-    - Battery percentage (blue line)
-    - Instantaneous discharge current (red line)
-    - Screen on/off intervals (shaded background bands)
-- [ ] **4.4 Anomaly Feed & Incident Log:**
-  - List of detected anomaly incidents with timestamps, peak discharge rate, duration, and culprit thread.
-  - Action button to kill or restrict culprit directly from UI.
+### Phase 2: Local Persistence & Anomaly Engine (Dart / Drift)
+*Focus: Code Quality & Reliability*
+- [ ] **2.1 Drift / SQLite Storage Engine:**
+  - Define schema: `TelemetrySamplesTable` and `AnomalyIncidentsTable`.
+  - In-memory ring buffer for 30 samples; flush to disk every 15 minutes to prevent flash I/O wakeups.
+  - Automatic rolling retention cleanup: prune samples older than 48 hours.
+- [ ] **2.2 Heuristic Anomaly Engine (`AnomalyEngine.dart`):**
+  - Baseline profiling: Calculate moving average of idle screen-off consumption.
+  - Detection triggers:
+    - *Mild Anomaly:* Screen-off $>5$ min AND sustained $>400mA$ across 3 samples.
+    - *Critical Anomaly:* Sustained $>750mA$ or $>4\%/hr$ drop with elevated thermals ($>38^\circ C$).
+- [ ] **2.3 Local Notifications:**
+  - Actionable system notifications alerting users of background drain with immediate "Inspect" action.
 
 ---
 
-## Phase 5: Power Budget, Hardening & Release
-- [ ] **5.1 Power Budget Verification:**
-  - Verify app's own 24-hour battery consumption is below $<0.3\%$.
-  - Batch database writes in-memory, flushing every 15 minutes.
-- [ ] **5.2 OEM Killer Defense:**
-  - Add whitelist guide for MIUI/HyperOS, Samsung OneUI, ColorOS.
-  - Shortcut to `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`.
-- [ ] **5.3 Release Preparation:**
-  - Configure GitHub Actions CI workflow to build release APKs and run unit tests.
+### Phase 3: Elevated Diagnostics & Differential Delta Engine
+*Focus: Feature Intelligence (Smarter than Battery Guru)*
+- [ ] **3.1 Elevated Backends (Shizuku + Kadb):**
+  - Shizuku integration (`dev.rikka.shizuku:api:13.1.5`).
+  - Native Kadb client integration (`com.flyfishxu:kadb:2.1.4`) for direct in-app Wireless Debugging on `localhost:5555`.
+  - Unified executor interface (`PrivilegedExecutor`) abstracting Shizuku and Kadb.
+- [ ] **3.2 Differential Delta Engine:**
+  - Capture Snapshot A (`top -b -n 1 -m 10`, `dumpsys batterystats --wake-locks`).
+  - Delay 5 seconds.
+  - Capture Snapshot B.
+  - Calculate delta ($\Delta$ CPU ticks per TID/PID and active wakelock holders) to isolate who is running *at that exact moment*.
+- [ ] **3.3 Intelligent Translation & Remediation:**
+  - Rulebook mapper:
+    - `AudioMix` / Media wakelock held $\to$ "Media service stuck open in background".
+    - `system_server / CpuTracker` $\to$ "System IPC contention loop (Reboot advised)".
+    - Third-party app package $\to$ "Rogue background process".
+  - One-tap remediation: `am force-stop <package>` or `cmd appops set <package> RUN_IN_BACKGROUND ignore`.
+
+---
+
+### Phase 4: Flutter UI / UX — Material 3 Minimalist Dashboard
+*Focus: UI/UX & Polish*
+- [ ] **4.1 Design System & Theme:**
+  - Pure OLED Dark Theme (`#000000` background, high contrast dynamic accents, zero light bleed).
+  - Consistent typography, subtle haptics on actions, and smooth micro-interactions.
+- [ ] **4.2 Real-time Sentinel HUD:**
+  - Live Discharge Current Dial: Color-coded arc gauge (green $<150mA$, amber $150\text{–}450mA$, red $>450mA$).
+  - Metric Pills: Battery %, Temperature ($^\circ C$), Voltage ($mV$), Screen state, and Elevated Privileges badge (Shizuku/Kadb active).
+- [ ] **4.3 Interactive Drain Timeline (`fl_chart`):**
+  - Multi-series chart: Discharge current ($mA$) + Battery level (%) over time.
+  - Shaded background vertical bands representing Screen-Off vs Screen-On windows.
+  - Scrubbable tooltip detailing drain rate at any specific minute.
+- [ ] **4.4 Anomaly Feed & Remediation Cards:**
+  - Incident cards with severity badges, duration, peak $mA$, and translated root cause.
+  - One-tap "Tame App" action button directly inside the card.
+- [ ] **4.5 Pairing Assistant Modal:**
+  - Guided step-by-step setup for Shizuku and direct Wireless Debugging (with port/pairing code inputs).
+
+---
+
+### Phase 5: Verification, Benchmarking & Packaging
+*Focus: Performance Verification & Release*
+- [ ] **5.1 CPU & Battery Overhead Benchmarking:**
+  - Profile Native Service execution time with Android Studio Profiler (verify $<10ms$ CPU time per tick).
+  - Verify total app 24-hour battery consumption is $<0.3\%$.
+- [ ] **5.2 OEM Killer Defense Documentation & Settings:**
+  - Whitelist prompt (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`).
+  - Vendor autostart guide for Xiaomi (HyperOS), Samsung (OneUI), and OnePlus.
+- [ ] **5.3 Automated CI/CD:**
+  - GitHub Actions workflow for building debug and release APKs with automated linting and tests.
