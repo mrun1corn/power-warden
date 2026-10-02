@@ -60,9 +60,9 @@ class PairingNotificationHelper(private val context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         )
 
-        // RemoteInput for typing 6-digit code in notification
+        // Compact RemoteInput label so input text is never pushed off-screen
         val remoteInput = RemoteInput.Builder(KEY_PAIRING_CODE)
-            .setLabel("Enter 6-digit code")
+            .setLabel("6-digit code")
             .build()
 
         val replyIntent = Intent(ACTION_CODE_SUBMITTED).apply {
@@ -82,21 +82,22 @@ class PairingNotificationHelper(private val context: Context) {
 
         val replyAction = NotificationCompat.Action.Builder(
             android.R.drawable.ic_input_add,
-            "Enter Code",
+            "Code",
             replyPendingIntent
         )
             .addRemoteInput(remoteInput)
             .build()
 
+        val portShort = if (discoveredPort != null) "Port: $discoveredPort" else "Waiting for port..."
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Pair Wireless Debugging")
-            .setContentText(portText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText("Keep Developer Options open! Enter the 6-digit pairing code below without switching apps:\n$portText"))
+            .setContentTitle("Wireless ADB Pairing")
+            .setContentText("$portShort · Tap Code to enter")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .addAction(replyAction)
-            .addAction(android.R.drawable.ic_menu_preferences, "Open Settings", openSettingsPending)
+            .addAction(android.R.drawable.ic_menu_preferences, "Settings", openSettingsPending)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
