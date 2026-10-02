@@ -1,87 +1,84 @@
-# Battery Watchdog — Implementation & Development Plans
+# PowerWarden — Implementation & Development Plans
 
 ## Overview
-This document outlines the phased roadmap for building **Battery Watchdog** from initial native hardware probing to full Flutter dashboard visualization and Shizuku integration.
+This document outlines the phased roadmap for building **PowerWarden** from native hardware telemetry probing to differential delta diagnostic profiling, Shizuku & Kadb integration, and a reactive Flutter dashboard.
 
 ---
 
 ## Phase 1: Native Android Hardware Telemetry Bridge (Kotlin)
-- [ ] **1.1 Battery Hardware Interface:**
-  - Implement `BatteryManager.BATTERY_PROPERTY_CURRENT_NOW` sampling (reading instantaneous $\mu A$).
-  - Convert negative microamperes into positive discharge current ($mA$) and charging currents.
-  - Implement fallback handling for OEMs returning microamperes inverted or in milliamperes.
-  - Read battery temperature via `Intent.ACTION_BATTERY_CHANGED`.
-- [ ] **1.2 Thermal & Throttling Observers:**
+- [ ] **1.1 Battery Hardware Interface (`BatteryProbe.kt`):**
+  - Sample `BatteryManager.BATTERY_PROPERTY_CURRENT_NOW` with dynamic $\mu A$ vs $mA$ scaling.
+  - Implement sign normalization: positive discharge current ($mA$), negative charging current ($mA$).
+  - 3-point rolling median filter to suppress cellular/modem bursts.
+  - Read battery temperature and voltage via `Intent.ACTION_BATTERY_CHANGED`.
+- [ ] **1.2 Thermal & Throttling Observers (`ThermalObserver.kt`):**
   - Register `PowerManager.OnThermalStatusChangedListener` (Android 10+ / API 29).
   - Map `THERMAL_STATUS_NONE` through `THERMAL_STATUS_CRITICAL` to standardized severity levels.
-- [ ] **1.3 Screen State Ingestion:**
+- [ ] **1.3 Screen State Ingestion (`ScreenStateReceiver.kt`):**
   - Register dynamic `BroadcastReceiver` for `Intent.ACTION_SCREEN_ON` and `Intent.ACTION_SCREEN_OFF`.
   - Maintain a state machine tracking exact duration of screen-off sleep windows.
-- [ ] **1.4 Low-Overhead Native Foreground Service:**
-  - Implement an Android foreground service with a low-priority notification channel.
-  - Set up an alarm/timer ticker to sample metrics every 60–120 seconds while the screen is off.
-  - Ensure sample execution completes within $<15ms$ to prevent CPU wakeup penalty.
+- [ ] **1.4 Foreground Service (`PowerWardenService.kt`):**
+  - Implement an Android foreground service with `specialUse` type (Android 14/15 compliant).
+  - Adaptive Zero-Wake ticker: relax during nominal idle (15–60mA), tighten during drain spikes.
+  - Ensure sample execution completes within $<10ms$ CPU time.
+  - Expose `MethodChannel` (`com.powerwarden/telemetry`) and `EventChannel` (`com.powerwarden/telemetry_stream`).
 
 ---
 
-## Phase 2: Anomaly Detection Engine (Dart / Kotlin)
+## Phase 2: Anomaly Engine & Incident Profiler (Dart / Kotlin)
 - [ ] **2.1 Baseline Profiling:**
-  - Measure normal device idle current consumption ($50\text{–}120mA$ on standard Android flagships with radios active).
-  - Identify ambient background baseline per device.
+  - Auto-learn device idle baseline current consumption ($50\text{–}120mA$ on standard Android flagships).
 - [ ] **2.2 Screen-Off Drain Detector:**
-  - If `screen_state == OFF` and `current_ma > 500mA` for $\ge 3$ consecutive sampling intervals:
+  - If `screen_state == OFF` and `current_ma > 450mA` across 3 consecutive cycles:
     - Escalate to `WARNING_RUNAWAY_DRAIN`.
-  - If sustained for $>10$ minutes with elevated thermal status:
+  - If sustained for $>10$ minutes with elevated thermal status ($>38^\circ\text{C}$):
     - Escalate to `CRITICAL_RUNAWAY_DRAIN`.
-- [ ] **2.3 Contention Benchmark Heuristic:**
-  - Run a lightweight, deterministic math loop (e.g. 100,000 iterations of SHA-256) on an isolated background isolate.
-  - If execution takes $>4\times$ the baseline duration during screen-off, trigger CPU starvation alert.
+- [ ] **2.3 Differential Snapshotting Engine:**
+  - On anomaly trigger: Capture Snapshot A (`top`, `dumpsys batterystats --wake-locks`), wait 5 seconds, capture Snapshot B, diff active threads and unreleased wakelocks.
 - [ ] **2.4 Notification Dispatcher:**
-  - Issue actionable local notifications (e.g., *"High background drain detected (740mA). A background thread is consuming a full CPU core. Tap to inspect or reboot."*).
+  - Dispatch actionable local notifications with culprit package/thread and direct one-tap fix buttons.
 
 ---
 
-## Phase 3: Shizuku / Local ADB Integration (Rootless Deep Inspection)
-- [ ] **3.1 Shizuku SDK Binding:**
+## Phase 3: Rootless Elevated Diagnostics (Shizuku + Kadb)
+- [ ] **3.1 Shizuku Integration:**
   - Integrate `dev.rikka.shizuku:api:13.1.5` and `dev.rikka.shizuku:provider:13.1.5`.
-  - Implement permission request flow and check if Shizuku service is running.
-- [ ] **3.2 Elevated Shell Executor:**
-  - Execute rootless shell commands via `Shizuku.newProcess`:
-    - `dumpsys batterystats --charged`
-    - `top -b -n 1 -s 9`
-    - `cat /proc/stat`
-- [ ] **3.3 Diagnostics Parser:**
-  - Parse `top` thread outputs to isolate specific thread names (`CpuTracker`, `system_server`, etc.).
-  - Match PID/TID to package name using `pm list packages -U`.
-  - Provide direct culprit naming in the anomaly report.
+  - Check binder availability, handle one-time permission request, execute privileged commands.
+- [ ] **3.2 In-App Kadb (Direct Wireless ADB Client):**
+  - Integrate `com.flyfishxu:kadb:2.1.4`.
+  - In-app pairing flow for Android 11+ Wireless Debugging over loopback (`127.0.0.1`).
+  - Auto-reconnect via mDNS port discovery.
+- [ ] **3.3 Privileged Remediator:**
+  - One-tap "Tame App": Execute `am force-stop <package>` or `cmd appops set <package> RUN_IN_BACKGROUND ignore`.
+  - Identify system loops vs third-party apps to recommend reboots vs app kills.
 
 ---
 
 ## Phase 4: Flutter User Interface & Analytics
-- [ ] **4.1 Architecture & State Management:**
-  - Set up Flutter project structure with `flutter_bloc` or `riverpod`.
-  - Set up `Drift` / `SQLite` database to persist historical battery samples and drain events.
+- [ ] **4.1 Architecture & Persistence:**
+  - Scaffold Flutter project structure (Material 3).
+  - Set up `Drift` / `SQLite` database to persist historical battery samples and drain events with a 48h rolling prune.
 - [ ] **4.2 Real-time Dashboard:**
-  - Live discharge current dial / gauge ($mA$).
-  - Temperature meter and thermal throttle badge.
-  - Screen state indicator.
+  - Live discharge current gauge / dial ($mA$).
+  - Temperature meter, voltage readout, and thermal throttle badge.
+  - Elevated status badge (Shizuku / Kadb active).
 - [ ] **4.3 Historical Drain Charts:**
   - Time-series chart (`fl_chart`) plotting:
     - Battery percentage (blue line)
     - Instantaneous discharge current (red line)
     - Screen on/off intervals (shaded background bands)
-- [ ] **4.4 Anomaly History & Incident Log:**
-  - List of detected anomaly events with timestamps, peak discharge rate, and duration.
-  - Culprit details (if Shizuku enabled) or symptom diagnosis (if pure tier-1).
+- [ ] **4.4 Anomaly Feed & Incident Log:**
+  - List of detected anomaly incidents with timestamps, peak discharge rate, duration, and culprit thread.
+  - Action button to kill or restrict culprit directly from UI.
 
 ---
 
 ## Phase 5: Power Budget, Hardening & Release
-- [ ] **5.1 Dogfooding & Power Budget:**
-  - Verify that the app's own 24-hour battery consumption is below $0.5\%$.
-  - Optimize database write batching (write samples in memory, flush to disk every 15 minutes).
-- [ ] **5.2 OEM Compatibility:**
-  - Guide users on disabling aggressive OEM battery optimizers (MIUI/HyperOS, Samsung OneUI, OxygenOS) that kill foreground services.
+- [ ] **5.1 Power Budget Verification:**
+  - Verify app's own 24-hour battery consumption is below $<0.3\%$.
+  - Batch database writes in-memory, flushing every 15 minutes.
+- [ ] **5.2 OEM Killer Defense:**
+  - Add whitelist guide for MIUI/HyperOS, Samsung OneUI, ColorOS.
+  - Shortcut to `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`.
 - [ ] **5.3 Release Preparation:**
-  - Android 14 and Android 15 compatibility validation (`FOREGROUND_SERVICE_SPECIAL_USE` permission declarations).
-  - Open-source release and GitHub Actions CI.
+  - Configure GitHub Actions CI workflow to build release APKs and run unit tests.
