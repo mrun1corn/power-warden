@@ -124,12 +124,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 children: [
-                  // Live Current Gauge
+                  // Live Current Gauge with Neon Halo
                   CurrentGauge(
                     currentMa: sample.currentMilliamps,
                     isCharging: sample.isCharging,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Metric Chips
                   MetricChips(
@@ -138,10 +138,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     temperatureCelsius: sample.temperatureCelsius,
                     voltageMv: sample.voltageMv,
                     isScreenOn: sample.isScreenOn,
-                    hasElevatedAccess: _elevatedStatus['hasShizuku'] == true,
-                    elevatedBackend: (_elevatedStatus['hasShizuku'] == true)
-                        ? ElevatedBackendType.shizuku
-                        : ElevatedBackendType.none,
+                    hasElevatedAccess: _elevatedStatus['hasShizuku'] == true || _elevatedStatus['hasKadb'] == true,
+                    elevatedBackend: (_elevatedStatus['hasKadb'] == true)
+                        ? ElevatedBackendType.kadb
+                        : ((_elevatedStatus['hasShizuku'] == true)
+                            ? ElevatedBackendType.shizuku
+                            : ElevatedBackendType.none),
                     onTapElevated: _showPairingModal,
                   ),
                   const SizedBox(height: 16),

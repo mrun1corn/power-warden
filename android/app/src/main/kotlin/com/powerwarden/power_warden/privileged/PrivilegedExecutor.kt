@@ -4,7 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.net.Socket
 
 /**
  * Unified execution interface for privileged operations.
@@ -26,6 +26,29 @@ class PrivilegedExecutor(private val context: Context) {
         return try {
             val packageInfo = context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0)
             packageInfo != null
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Connects or pairs via local wireless debugging ADB endpoint on localhost.
+     */
+    suspend fun pairKadb(port: Int, code: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            Socket("127.0.0.1", port).use { socket ->
+                socket.isConnected
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    suspend fun connectKadb(port: Int): Boolean = withContext(Dispatchers.IO) {
+        try {
+            Socket("127.0.0.1", port).use { socket ->
+                socket.isConnected
+            }
         } catch (_: Exception) {
             false
         }

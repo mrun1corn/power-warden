@@ -80,254 +80,188 @@ class _CurrentGaugeState extends State<CurrentGauge>
   @override
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor();
-    final isDraining = !widget.isCharging;
     final displayMa = widget.currentMa.abs();
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = math.min(constraints.maxWidth, 280.0);
-
-        return Center(
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: AnimatedBuilder(
-              animation: _needleAnimation,
-              builder: (context, child) {
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CustomPaint(
-                      size: Size(size, size),
-                      painter: _GaugePainter(
-                        normalizedValue: _needleAnimation.value,
-                        isCharging: widget.isCharging,
-                        themeColor: statusColor,
+    return Center(
+      child: Container(
+        width: 280,
+        height: 250,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: statusColor.withOpacity(0.08),
+              blurRadius: 40,
+              spreadRadius: 5,
+            ),
+          ],
+        ),
+        child: AnimatedBuilder(
+          animation: _needleAnimation,
+          builder: (context, _) {
+            return CustomPaint(
+              painter: _HudGaugePainter(
+                value: _needleAnimation.value,
+                statusColor: statusColor,
+                isCharging: widget.isCharging,
+              ),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 25.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: statusColor.withOpacity(0.4), width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              widget.isCharging ? 'CHARGING' : 'DISCHARGING',
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Positioned(
-                      bottom: size * 0.16,
-                      child: Column(
+                      const SizedBox(height: 10),
+                      Row(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
                         children: [
-                          // Status Badge (DRAINING / CHARGING)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: statusColor.withOpacity(0.4),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  widget.isCharging
-                                      ? Icons.bolt
-                                      : (displayMa > 800
-                                          ? Icons.warning_amber_rounded
-                                          : Icons.arrow_downward_rounded),
-                                  size: 14,
-                                  color: statusColor,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  widget.isCharging ? 'CHARGING' : 'DRAINING',
-                                  style: TextStyle(
-                                    color: statusColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          // Current mA Reading
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                '${isDraining ? "-" : "+"}$displayMa',
-                                style: const TextStyle(
-                                  color: AppTheme.textPrimary,
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.5,
-                                  fontFeatures: [FontFeature.tabularFigures()],
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Text(
-                                'mA',
-                                style: TextStyle(
-                                  color: AppTheme.textSecondary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
                           Text(
-                            widget.isCharging
-                                ? 'Charge Current'
-                                : (displayMa > 800
-                                    ? 'High Idle Spike'
-                                    : 'Instantaneous Draw'),
+                            '$displayMa',
                             style: const TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
+                              fontSize: 54,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -1.5,
+                              color: Colors.white,
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'mA',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: statusColor,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.isCharging ? 'INFLOW CURRENT' : 'INSTANT VELOCITY',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }
 
-class _GaugePainter extends CustomPainter {
-  final double normalizedValue; // 0.0 to 1.0
+class _HudGaugePainter extends CustomPainter {
+  final double value;
+  final Color statusColor;
   final bool isCharging;
-  final Color themeColor;
 
-  _GaugePainter({
-    required this.normalizedValue,
+  _HudGaugePainter({
+    required this.value,
+    required this.statusColor,
     required this.isCharging,
-    required this.themeColor,
   });
-
-  // 240 degree sweep arc
-  // Starts at 150 deg (5*pi/6) and sweeps 240 deg (4*pi/3) to 390 deg (30 deg)
-  static const double _startAngle = 150 * (math.pi / 180);
-  static const double _sweepAngle = 240 * (math.pi / 180);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width / 2) - 16;
+    final center = Offset(size.width / 2, size.height / 2 + 10);
+    final radius = size.width / 2 - 20;
 
-    final trackPaint = Paint()
-      ..color = const Color(0xFF1E1E1E)
+    const startAngle = 135 * (math.pi / 180);
+    const sweepTotal = 270 * (math.pi / 180);
+
+    final bgPaint = Paint()
+      ..color = AppTheme.surfaceVariant
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 14
+      ..strokeWidth = 10
       ..strokeCap = StrokeCap.round;
 
-    final glowPaint = Paint()
-      ..color = themeColor.withOpacity(0.2)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 20
-      ..strokeCap = StrokeCap.round;
-
-    final activePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 14
-      ..strokeCap = StrokeCap.round;
-
-    if (isCharging) {
-      activePaint.color = AppTheme.chargingCyan;
-    } else {
-      activePaint.shader = SweepGradient(
-        startAngle: _startAngle,
-        endAngle: _startAngle + _sweepAngle,
-        colors: const [
-          AppTheme.accentGreen,
-          AppTheme.amber,
-          AppTheme.crimson,
-        ],
-        stops: const [0.0, 0.45, 1.0],
-        transform: GradientRotation(_startAngle),
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    }
-
-    final arcRect = Rect.fromCircle(center: center, radius: radius);
-
-    // Draw background track
-    canvas.drawArc(arcRect, _startAngle, _sweepAngle, false, trackPaint);
-
-    // Active arc progress
-    final currentSweep = _sweepAngle * normalizedValue.clamp(0.01, 1.0);
-    if (normalizedValue > 0.02) {
-      canvas.drawArc(arcRect, _startAngle, currentSweep, false, glowPaint);
-    }
-    canvas.drawArc(arcRect, _startAngle, currentSweep, false, activePaint);
-
-    // Tick marks
-    _drawTicks(canvas, center, radius);
-
-    // Needle indicator
-    _drawNeedle(canvas, center, radius);
-  }
-
-  void _drawTicks(Canvas canvas, Offset center, double radius) {
-    const totalTicks = 9;
-    final tickPaint = Paint()
-      ..color = const Color(0xFF424242)
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-
-    for (int i = 0; i < totalTicks; i++) {
-      final ratio = i / (totalTicks - 1);
-      final angle = _startAngle + (_sweepAngle * ratio);
-      final outerX = center.dx + (radius + 12) * math.cos(angle);
-      final outerY = center.dy + (radius + 12) * math.sin(angle);
-      final innerX = center.dx + (radius + 6) * math.cos(angle);
-      final innerY = center.dy + (radius + 6) * math.sin(angle);
-
-      canvas.drawLine(Offset(innerX, innerY), Offset(outerX, outerY), tickPaint);
-    }
-  }
-
-  void _drawNeedle(Canvas canvas, Offset center, double radius) {
-    final currentAngle = _startAngle + (_sweepAngle * normalizedValue.clamp(0.0, 1.0));
-    final needleLength = radius - 8;
-
-    final needleTip = Offset(
-      center.dx + needleLength * math.cos(currentAngle),
-      center.dy + needleLength * math.sin(currentAngle),
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepTotal,
+      false,
+      bgPaint,
     );
 
-    // Center pivot circle
-    final pivotPaint = Paint()
-      ..color = const Color(0xFF1E1E1E)
-      ..style = PaintingStyle.fill;
-    final pivotBorderPaint = Paint()
-      ..color = themeColor
+    final activePaint = Paint()
+      ..shader = SweepGradient(
+        startAngle: startAngle,
+        endAngle: startAngle + sweepTotal,
+        colors: [
+          isCharging ? AppTheme.chargingCyan : AppTheme.accentGreen,
+          isCharging ? AppTheme.chargingCyan : AppTheme.amber,
+          statusColor,
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: radius))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-
-    // Needle line
-    final needlePaint = Paint()
-      ..color = themeColor
-      ..strokeWidth = 3
+      ..strokeWidth = 10
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawLine(center, needleTip, needlePaint);
-    canvas.drawCircle(center, 7, pivotPaint);
-    canvas.drawCircle(center, 7, pivotBorderPaint);
+    final currentSweep = sweepTotal * value.clamp(0.01, 1.0);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      currentSweep,
+      false,
+      activePaint,
+    );
+
+    final tickPaint = Paint()
+      ..color = AppTheme.surfaceBorder
+      ..strokeWidth = 1.5;
+
+    for (int i = 0; i <= 20; i++) {
+      final angle = startAngle + (sweepTotal * (i / 20));
+      final inner = radius - 16;
+      final outer = radius - 8;
+
+      final p1 = Offset(center.dx + inner * math.cos(angle), center.dy + inner * math.sin(angle));
+      final p2 = Offset(center.dx + outer * math.cos(angle), center.dy + outer * math.sin(angle));
+      canvas.drawLine(p1, p2, tickPaint);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _GaugePainter oldDelegate) {
-    return oldDelegate.normalizedValue != normalizedValue ||
-        oldDelegate.isCharging != isCharging ||
-        oldDelegate.themeColor != themeColor;
+  bool shouldRepaint(covariant _HudGaugePainter oldDelegate) {
+    return oldDelegate.value != value || oldDelegate.statusColor != statusColor;
   }
 }

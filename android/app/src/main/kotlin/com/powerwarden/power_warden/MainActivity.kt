@@ -91,6 +91,21 @@ class MainActivity : FlutterActivity() {
                     )
                     result.success(statusMap)
                 }
+                "pairKadbLocal" -> {
+                    val port = call.argument<Int>("port") ?: 5555
+                    val code = call.argument<String>("code") ?: ""
+                    activityScope.launch {
+                        val ok = privilegedExecutor.pairKadb(port, code)
+                        result.success(ok)
+                    }
+                }
+                "connectKadbLocal" -> {
+                    val port = call.argument<Int>("port") ?: 5555
+                    activityScope.launch {
+                        val ok = privilegedExecutor.connectKadb(port)
+                        result.success(ok)
+                    }
+                }
                 "runDeltaDiagnostics" -> {
                     activityScope.launch {
                         val diag = privilegedExecutor.runDifferentialDiagnostics()
