@@ -109,31 +109,77 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     /**
-     * Retrieves the top active processes with CPU and memory resource consumption.
+     * Retrieves top active processes with accurate CPU %, RAM (MB), and CPU execution time.
+     * Accurately parses Android toybox/toolbox top table by dynamic header detection.
      */
     suspend fun getTopProcesses(): List<Map<String, Any>> = withContext(Dispatchers.IO) {
         val list = mutableListOf<Map<String, Any>>()
         try {
-            val res = executeCommand("top -b -n 1 -m 15")
+            val res = executeCommand("top -b -n 1 -m 20")
             val lines = res.stdout.lines()
 
-            for (line in lines) {
-                val tokens = line.trim().split("\\s+".toRegex())
-                // Typical top line on Android: PID USER PR NI VIRT RES SHR S [%CPU] [%MEM] TIME+ ARGS
-                if (tokens.size >= 9 && tokens[0].all { it.isDigit() }) {
-                    val pid = tokens[0]
-                    val cpuStr = tokens.find { it.endsWith("%") || it.toDoubleOrNull() != null } ?: "0"
-                    val pkgName = tokens.last()
+            var cpuColIdx = -1
+            var resColIdx = -1
+            var timeColIdx = -1
+            var argsColIdx = -1
 
-                    // Filter out kernel threads like [ksoftirqd]
-                    if (!pkgName.startsWith("[") && pkgName.contains(".")) {
-                        val cpuPercent = cpuStr.replace("%", "").toDoubleOrNull() ?: 0.0
+            for (line in lines) {
+                val trimmed = line.trim()
+                if (trimmed.isEmpty()) continue
+
+                val tokens = trimmed.split("\\s+".toRegex())
+
+                // Detect header line dynamically
+                if (tokens.any { it.equals("PID", ignoreCase = true) } && tokens.any { it.contains("CPU", ignoreCase = true) }) {
+                    for (i in tokens.indices) {
+                        val header = tokens[i].uppercase()
+                        if (header == "%CPU" || header == "CPU" || header == "CPU%") cpuColIdx = i
+                        else if (header == "RES" || header == "RSS" || header == "VIRT") resColIdx = i
+                        else if (header.startsWith("TIME")) timeColIdx = i
+                        else if (header == "ARGS" || header == "CMD" || header == "NAME") argsColIdx = i
+                    }
+                    continue
+                }
+
+                // Process data line
+                if (cpuColIdx != -1 && tokens.isNotEmpty() && tokens[0].all { it.isDigit() }) {
+                    val pid = tokens[0]
+
+                    val rawCpu = if (cpuColIdx < tokens.size) tokens[cpuColIdx] else "0"
+                    val parsedCpu = rawCpu.replace("%", "").toDoubleOrNull() ?: 0.0
+
+                    // Sanity check: single process CPU cannot exceed 100% per core
+                    val cpuPercent = if (parsedCpu > 100.0) 100.0 else parsedCpu
+
+                    val rawRes = if (resColIdx != -1 && resColIdx < tokens.size) tokens[resColIdx] else ""
+                    val ramMb = parseMemoryToMb(rawRes)
+
+                    val cpuTime = if (timeColIdx != -1 && timeColIdx < tokens.size) tokens[timeColIdx] else "--:--"
+
+                    val pkgName = if (argsColIdx != -1 && argsColIdx < tokens.size) {
+                        tokens.subList(argsColIdx, tokens.size).joinToString(" ")
+                    } else {
+                        tokens.last()
+                    }
+
+                    // Filter out internal kernel threads [ksoftirqd]
+                    if (!pkgName.startsWith("[") && pkgName.isNotBlank()) {
+                        val cleanName = when {
+                            pkgName.contains("/") -> pkgName.substringAfterLast("/")
+                            pkgName.contains(":") -> pkgName.substringBefore(":")
+                            else -> pkgName
+                        }
+
+                        val appLabel = cleanName.substringAfterLast(".").replace("_", " ").capitalizeWords()
+
                         list.add(
                             mapOf(
                                 "pid" to pid,
                                 "packageName" to pkgName,
-                                "cpuPercent" to cpuPercent,
-                                "name" to pkgName.substringAfterLast(".")
+                                "name" to appLabel,
+                                "cpuPercent" to Math.round(cpuPercent * 10.0) / 10.0,
+                                "ramMb" to ramMb,
+                                "cpuTime" to cpuTime
                             )
                         )
                     }
@@ -141,8 +187,26 @@ class PrivilegedExecutor(private val context: Context) {
             }
         } catch (_: Exception) {}
 
-        // Fallback or sorted by CPU
-        list.sortedByDescending { (it["cpuPercent"] as? Double) ?: 0.0 }.take(10)
+        list.sortedByDescending { (it["cpuPercent"] as? Double) ?: 0.0 }.take(15)
+    }
+
+    private fun parseMemoryToMb(raw: String): Int {
+        if (raw.isBlank()) return 0
+        val upper = raw.uppercase()
+        return try {
+            when {
+                upper.endsWith("G") -> (upper.removeSuffix("G").toDouble() * 1024).toInt()
+                upper.endsWith("M") -> upper.removeSuffix("M").toDouble().toInt()
+                upper.endsWith("K") -> (upper.removeSuffix("K").toDouble() / 1024).toInt()
+                else -> (upper.toDouble() / 1024).toInt()
+            }
+        } catch (_: Exception) {
+            0
+        }
+    }
+
+    private fun String.capitalizeWords(): String {
+        return split(" ").joinToString(" ") { it.replaceFirstChar { char -> char.uppercase() } }
     }
 
     /**

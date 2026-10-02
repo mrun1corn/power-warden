@@ -34,6 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Map<String, dynamic>> _topProcesses = [];
   bool _isLoadingProcesses = false;
+  Timer? _processRefreshTimer;
 
   @override
   void initState() {
@@ -47,6 +48,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _currentSample = await _telemetryService.getInstantMetrics();
     await _telemetryService.startForegroundService();
     _loadProcesses();
+
+    // Auto-refresh active energy consumers every 5 seconds
+    _processRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _loadProcesses();
+    });
 
     // Listen to live stream
     _streamSub = _telemetryService.telemetryStream.listen((sample) {
@@ -69,6 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _streamSub?.cancel();
+    _processRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -340,6 +347,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final name = (proc['name'] as String?) ?? 'App';
                 final pkg = (proc['packageName'] as String?) ?? '';
                 final cpu = (proc['cpuPercent'] as num?)?.toDouble() ?? 0.0;
+                final ramMb = (proc['ramMb'] as num?)?.toInt() ?? 0;
+                final cpuTime = (proc['cpuTime'] as String?) ?? '';
                 final isHeavy = cpu > 10.0;
 
                 return ListTile(
@@ -356,9 +365,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: isHeavy ? AppTheme.crimson : AppTheme.textSecondary,
                     ),
                   ),
-                  title: Text(
-                    name.toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name.toUpperCase(),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (ramMb > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          margin: const EdgeInsets.only(left: 6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceVariant,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${ramMb}MB RAM',
+                            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 9, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      if (cpuTime.isNotEmpty && cpuTime != '--:--')
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4.0),
+                          child: Text(
+                            cpuTime,
+                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 9),
+                          ),
+                        ),
+                    ],
                   ),
                   subtitle: Text(
                     pkg,
