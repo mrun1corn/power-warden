@@ -66,6 +66,15 @@ class TelemetryService {
     return {'hasShizuku': false, 'hasPermission': false, 'hasKadb': false};
   }
 
+  Future<bool> requestShizukuPermission() async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('requestShizukuPermission');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> pairKadb(int port, String code) async {
     try {
       final res = await _methodChannel.invokeMethod<bool>('pairKadbLocal', {

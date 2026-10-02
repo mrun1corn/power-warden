@@ -84,26 +84,24 @@ class MainActivity : FlutterActivity() {
                 }
                 "getElevatedBackendStatus" -> {
                     val hasShizuku = privilegedExecutor.isShizukuAvailable()
+                    val hasPerm = privilegedExecutor.hasShizukuPermission()
                     val statusMap = mapOf(
                         "hasShizuku" to hasShizuku,
-                        "hasPermission" to false,
+                        "hasPermission" to hasPerm,
                         "hasKadb" to false
                     )
                     result.success(statusMap)
                 }
-                "pairKadbLocal" -> {
-                    val port = call.argument<Int>("port") ?: 5555
-                    val code = call.argument<String>("code") ?: ""
-                    activityScope.launch {
-                        val ok = privilegedExecutor.pairKadb(port, code)
-                        result.success(ok)
-                    }
-                }
-                "connectKadbLocal" -> {
-                    val port = call.argument<Int>("port") ?: 5555
-                    activityScope.launch {
-                        val ok = privilegedExecutor.connectKadb(port)
-                        result.success(ok)
+                "requestShizukuPermission" -> {
+                    if (privilegedExecutor.isShizukuAvailable()) {
+                        try {
+                            rikka.shizuku.Shizuku.requestPermission(1001)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(false)
                     }
                 }
                 "runDeltaDiagnostics" -> {

@@ -75,14 +75,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => WirelessPairingSheet(
         hasShizuku: _elevatedStatus['hasShizuku'] ?? false,
-        hasKadb: _elevatedStatus['hasKadb'] ?? false,
-        onRequestShizuku: () async {
-          Navigator.pop(context);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Requesting Shizuku authorization...')),
-            );
-          }
+        hasPermission: _elevatedStatus['hasPermission'] ?? false,
+        onAuthorized: () async {
+          final s = await _telemetryService.getElevatedStatus();
+          setState(() => _elevatedStatus = s);
         },
       ),
     );
@@ -170,12 +166,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       temperatureCelsius: sample.temperatureCelsius,
                       voltageMv: sample.voltageMv,
                       isScreenOn: sample.isScreenOn,
-                      hasElevatedAccess: _elevatedStatus['hasShizuku'] == true || _elevatedStatus['hasKadb'] == true,
-                      elevatedBackend: (_elevatedStatus['hasKadb'] == true)
-                          ? ElevatedBackendType.kadb
-                          : ((_elevatedStatus['hasShizuku'] == true)
-                              ? ElevatedBackendType.shizuku
-                              : ElevatedBackendType.none),
+                      hasElevatedAccess: _elevatedStatus['hasPermission'] == true,
+                      elevatedBackend: (_elevatedStatus['hasPermission'] == true)
+                          ? ElevatedBackendType.shizuku
+                          : ElevatedBackendType.none,
                       onTapElevated: _showPairingModal,
                     ),
                     const SizedBox(height: 16),

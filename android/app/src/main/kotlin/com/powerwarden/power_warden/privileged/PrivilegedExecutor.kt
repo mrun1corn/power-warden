@@ -1,14 +1,17 @@
 package com.powerwarden.power_warden.privileged
 
 import android.content.Context
+import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import rikka.shizuku.Shizuku
 import java.io.BufferedReader
-import java.net.Socket
+import java.lang.reflect.Method
 
 /**
  * Unified execution interface for privileged operations.
- * Supports direct Shizuku binder calls and local shell execution.
+ * Prioritizes Shizuku's persistent Binder IPC so permissions and shell access
+ * remain active seamlessly across app switches and device sleep cycles.
  */
 class PrivilegedExecutor(private val context: Context) {
 
@@ -19,35 +22,41 @@ class PrivilegedExecutor(private val context: Context) {
         val isSuccess: Boolean
     )
 
+    private var shizukuNewProcessMethod: Method? = null
+
+    init {
+        try {
+            val method = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            )
+            method.isAccessible = true
+            shizukuNewProcessMethod = method
+        } catch (_: Exception) {}
+    }
+
     /**
-     * Checks if Shizuku is currently installed and running.
+     * Checks if Shizuku manager service is alive and accessible.
      */
     fun isShizukuAvailable(): Boolean {
         return try {
-            val packageInfo = context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0)
-            packageInfo != null
+            Shizuku.pingBinder()
         } catch (_: Exception) {
             false
         }
     }
 
     /**
-     * Connects or pairs via local wireless debugging ADB endpoint on localhost.
+     * Checks if user has already granted Shizuku permissions to PowerWarden.
      */
-    suspend fun pairKadb(port: Int, code: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Socket("127.0.0.1", port).use { socket ->
-                socket.isConnected
-            }
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    suspend fun connectKadb(port: Int): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Socket("127.0.0.1", port).use { socket ->
-                socket.isConnected
+    fun hasShizukuPermission(): Boolean {
+        return try {
+            if (Shizuku.isPreV11()) {
+                false
+            } else {
+                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
             }
         } catch (_: Exception) {
             false
@@ -55,11 +64,17 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     /**
-     * Executes shell command via standard Runtime or Shizuku process.
+     * Executes shell commands directly via Shizuku's elevated process if available,
+     * falling back to standard runtime shell.
      */
     suspend fun executeCommand(command: String): ExecutionResult = withContext(Dispatchers.IO) {
         try {
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            val process: Process = if (isShizukuAvailable() && hasShizukuPermission() && shizukuNewProcessMethod != null) {
+                shizukuNewProcessMethod!!.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
+            } else {
+                Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            }
+
             val stdout = process.inputStream.bufferedReader().use(BufferedReader::readText)
             val stderr = process.errorStream.bufferedReader().use(BufferedReader::readText)
             val exitCode = process.waitFor()
@@ -74,7 +89,7 @@ class PrivilegedExecutor(private val context: Context) {
             ExecutionResult(
                 exitCode = -1,
                 stdout = "",
-                stderr = e.message ?: "Unknown error",
+                stderr = e.message ?: "Execution failed",
                 isSuccess = false
             )
         }
@@ -99,9 +114,7 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     /**
-     * Remediates a runaway application:
-     * - "force_stop": Kills process tree immediately
-     * - "restrict_bg": Sets RUN_IN_BACKGROUND to ignore
+     * Remediates a runaway application using elevated Shizuku shell.
      */
     suspend fun remediateApp(packageName: String, action: String): Boolean = withContext(Dispatchers.IO) {
         val cmd = when (action) {
