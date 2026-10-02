@@ -64,6 +64,19 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     /**
+     * Connects or pairs via local wireless debugging ADB endpoint on localhost.
+     */
+    suspend fun pairKadb(port: Int, code: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            java.net.Socket("127.0.0.1", port).use { socket ->
+                socket.isConnected
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * Executes shell commands directly via Shizuku's elevated process if available,
      * falling back to standard runtime shell.
      */
