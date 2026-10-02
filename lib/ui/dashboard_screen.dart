@@ -198,9 +198,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       voltageMv: sample.voltageMv,
                       isScreenOn: sample.isScreenOn,
                       hasElevatedAccess: _elevatedStatus['hasPermission'] == true,
-                      elevatedBackend: (_elevatedStatus['hasPermission'] == true)
-                          ? ElevatedBackendType.shizuku
-                          : ElevatedBackendType.none,
+                      elevatedBackend: (_elevatedStatus['hasKadb'] == true)
+                          ? ElevatedBackendType.kadb
+                          : ((_elevatedStatus['hasPermission'] == true)
+                              ? ElevatedBackendType.shizuku
+                              : ElevatedBackendType.none),
                       onTapElevated: _showPairingModal,
                     ),
                     const SizedBox(height: 16),

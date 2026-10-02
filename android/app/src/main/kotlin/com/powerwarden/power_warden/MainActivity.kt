@@ -44,10 +44,11 @@ class MainActivity : FlutterActivity() {
         }
 
         com.powerwarden.power_warden.service.PairingNotificationHelper.onCodeReceivedListener = { code ->
-            val port = mdnsDiscovery.discoveredPairingPort
-            if (port != null) {
+            val pairingPort = mdnsDiscovery.discoveredPairingPort
+            val connectPort = mdnsDiscovery.discoveredConnectPort
+            if (pairingPort != null) {
                 activityScope.launch {
-                    val ok = privilegedExecutor.pairKadb(port, code)
+                    val ok = privilegedExecutor.pairKadb(pairingPort, code, connectPort)
                     if (ok) {
                         pairingNotificationHelper.dismiss()
                     }
@@ -150,10 +151,11 @@ class MainActivity : FlutterActivity() {
                 "getElevatedBackendStatus" -> {
                     val hasShizuku = privilegedExecutor.isShizukuAvailable()
                     val hasPerm = privilegedExecutor.hasShizukuPermission()
+                    val hasKadb = privilegedExecutor.hasKadbConnected()
                     val statusMap = mapOf(
                         "hasShizuku" to hasShizuku,
-                        "hasPermission" to hasPerm,
-                        "hasKadb" to false
+                        "hasPermission" to (hasPerm || hasKadb),
+                        "hasKadb" to hasKadb
                     )
                     result.success(statusMap)
                 }
@@ -172,8 +174,9 @@ class MainActivity : FlutterActivity() {
                 "pairKadbLocal" -> {
                     val port = call.argument<Int>("port") ?: 5555
                     val code = call.argument<String>("code") ?: ""
+                    val connectPort = mdnsDiscovery.discoveredConnectPort
                     activityScope.launch {
-                        val ok = privilegedExecutor.pairKadb(port, code)
+                        val ok = privilegedExecutor.pairKadb(port, code, connectPort)
                         result.success(ok)
                     }
                 }

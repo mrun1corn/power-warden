@@ -66,12 +66,23 @@ class PrivilegedExecutor(private val context: Context) {
         }
     }
 
+    private var activeKadb: com.flyfishxu.kadb.Kadb? = null
+
     /**
-     * Executes real SPAKE2 TLS pairing protocol with Android Wireless Debugging.
+     * Executes real SPAKE2 TLS pairing protocol with Android Wireless Debugging,
+     * and automatically connects to the active connection port once paired.
      */
-    suspend fun pairKadb(port: Int, code: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun pairKadb(pairingPort: Int, code: String, connectPort: Int? = null): Boolean = withContext(Dispatchers.IO) {
         try {
-            com.flyfishxu.kadb.Kadb.pair("127.0.0.1", port, code)
+            // 1. Execute SPAKE2 cryptographic key exchange on pairing port
+            com.flyfishxu.kadb.Kadb.pair("127.0.0.1", pairingPort, code)
+
+            // 2. Connect to the active debugging session port if available
+            if (connectPort != null && connectPort > 0) {
+                try {
+                    activeKadb = com.flyfishxu.kadb.Kadb.create("127.0.0.1", connectPort)
+                } catch (_: Exception) {}
+            }
             true
         } catch (_: Exception) {
             false
@@ -79,17 +90,46 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     /**
+     * Connects to the active Wireless Debugging port (dispatched by mDNS _adb-tls-connect).
+     */
+    suspend fun connectKadb(port: Int): Boolean = withContext(Dispatchers.IO) {
+        try {
+            activeKadb = com.flyfishxu.kadb.Kadb.create("127.0.0.1", port)
+            val resp = activeKadb?.shell("echo ping")
+            resp?.exitCode == 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun hasKadbConnected(): Boolean {
+        return activeKadb != null
+    }
+
+    /**
      * Executes shell commands directly via Shizuku's elevated process if available,
-     * falling back to standard runtime shell.
+     * falling back to Kadb ADB shell, and finally standard runtime shell.
      */
     suspend fun executeCommand(command: String): ExecutionResult = withContext(Dispatchers.IO) {
         try {
-            val process: Process = if (isShizukuAvailable() && hasShizukuPermission() && shizukuNewProcessMethod != null) {
-                shizukuNewProcessMethod!!.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
-            } else {
-                Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            if (isShizukuAvailable() && hasShizukuPermission() && shizukuNewProcessMethod != null) {
+                val process = shizukuNewProcessMethod!!.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
+                val stdout = process.inputStream.bufferedReader().use(BufferedReader::readText)
+                val stderr = process.errorStream.bufferedReader().use(BufferedReader::readText)
+                val exitCode = process.waitFor()
+                return@withContext ExecutionResult(exitCode, stdout.trim(), stderr.trim(), exitCode == 0)
             }
 
+            // Fallback to active Kadb connection
+            if (activeKadb != null) {
+                try {
+                    val resp = activeKadb!!.shell(command)
+                    return@withContext ExecutionResult(resp.exitCode, resp.output.trim(), "", resp.exitCode == 0)
+                } catch (_: Exception) {}
+            }
+
+            // Standard runtime shell
+            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
             val stdout = process.inputStream.bufferedReader().use(BufferedReader::readText)
             val stderr = process.errorStream.bufferedReader().use(BufferedReader::readText)
             val exitCode = process.waitFor()
