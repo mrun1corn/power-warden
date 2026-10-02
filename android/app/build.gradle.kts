@@ -37,6 +37,13 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    packaging {
+        resources {
+            excludes += setOf("META-INF/LICENSE.md", "META-INF/LICENSE-notice.md")
+            pickFirsts += "META-INF/**"
+        }
+    }
 }
 
 kotlin {
@@ -54,4 +61,5 @@ dependencies {
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("dev.rikka.tools.refine:runtime:4.4.0")
+    implementation("dev.mobile:dadb:1.2.6")
 }

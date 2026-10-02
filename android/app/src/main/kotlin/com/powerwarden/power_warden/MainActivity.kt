@@ -110,21 +110,29 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "openWirelessDebuggingSettings" -> {
-                    try {
-                        val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        startActivity(intent)
-                        result.success(true)
-                    } catch (e: Exception) {
+                    val intents = listOf(
+                        // Intent 1: Direct Wireless Debugging Sub-Fragment (Android 11+)
+                        Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS"),
+                        // Intent 2: Standard Developer Settings with deep fragment target
+                        Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                            putExtra(":settings:show_fragment", "com.android.settings.development.WirelessDebuggingFragment")
+                        },
+                        // Intent 3: General Developer Settings fallback
+                        Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
+                        // Intent 4: Global Settings fallback
+                        Intent(android.provider.Settings.ACTION_SETTINGS)
+                    )
+
+                    var opened = false
+                    for (intent in intents) {
                         try {
-                            val intent = Intent(android.provider.Settings.ACTION_SETTINGS)
                             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             startActivity(intent)
-                            result.success(true)
-                        } catch (_: Exception) {
-                            result.success(false)
-                        }
+                            opened = true
+                            break
+                        } catch (_: Exception) {}
                     }
+                    result.success(opened)
                 }
                 "startMdnsDiscovery" -> {
                     mdnsDiscovery.startDiscovery()

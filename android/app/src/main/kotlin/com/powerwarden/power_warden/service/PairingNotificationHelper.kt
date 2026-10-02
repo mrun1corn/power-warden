@@ -50,19 +50,34 @@ class PairingNotificationHelper(private val context: Context) {
     fun showPairingNotification(discoveredPort: Int?) {
         val portText = if (discoveredPort != null) "Detected Port: $discoveredPort" else "Searching for port via mDNS..."
 
+        val openSettingsIntent = Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val openSettingsPending = PendingIntent.getActivity(
+            context,
+            1003,
+            openSettingsIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        )
+
         // RemoteInput for typing 6-digit code in notification
         val remoteInput = RemoteInput.Builder(KEY_PAIRING_CODE)
-            .setLabel("Enter 6-digit pairing code")
+            .setLabel("Enter 6-digit code")
             .build()
 
         val replyIntent = Intent(ACTION_CODE_SUBMITTED).apply {
             setPackage(context.packageName)
         }
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
         val replyPendingIntent = PendingIntent.getBroadcast(
             context,
-            0,
+            1002,
             replyIntent,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
+            flags
         )
 
         val replyAction = NotificationCompat.Action.Builder(
@@ -81,6 +96,7 @@ class PairingNotificationHelper(private val context: Context) {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .addAction(replyAction)
+            .addAction(android.R.drawable.ic_menu_preferences, "Open Settings", openSettingsPending)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)

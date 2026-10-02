@@ -71,9 +71,15 @@ class PrivilegedExecutor(private val context: Context) {
      */
     suspend fun pairKadb(port: Int, code: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            java.net.Socket("127.0.0.1", port).use { socket ->
-                socket.isConnected
-            }
+            // First verify socket connectivity to the target port
+            val socket = java.net.Socket()
+            socket.connect(java.net.InetSocketAddress("127.0.0.1", port), 3000)
+            socket.close()
+
+            // Connect using dadb client
+            val dadb = dadb.Dadb.create("127.0.0.1", port)
+            val resp = dadb.shell("echo ping")
+            resp.exitCode == 0
         } catch (_: Exception) {
             false
         }

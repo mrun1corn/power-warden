@@ -117,7 +117,7 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
         _isPairingKadb = false;
         _kadbMessage = ok
             ? '✓ Successfully paired via Wireless ADB!'
-            : '✗ Pairing failed. Verify Wireless Debugging is on.';
+            : '✗ Connection to port $port failed. Please verify Wireless Debugging is enabled.';
       });
       if (ok) {
         widget.onAuthorized();
