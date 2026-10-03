@@ -8,9 +8,7 @@ import '../services/notification_service.dart';
 import '../services/telemetry_service.dart';
 import 'theme.dart';
 import 'widgets/anomaly_card.dart';
-import 'widgets/current_gauge.dart';
 import 'widgets/drain_timeline_chart.dart';
-import 'widgets/metric_chips.dart';
 import 'widgets/wireless_pairing_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -32,7 +30,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   StreamSubscription<TelemetrySample>? _streamSub;
   Map<String, bool> _elevatedStatus = {'hasShizuku': false, 'hasPermission': false, 'hasKadb': false};
-  bool _isProMode = false;
 
   List<Map<String, dynamic>> _topProcesses = [];
   bool _isLoadingProcesses = false;
@@ -233,27 +230,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          // Pro / Simple Mode Switcher
-          TextButton.icon(
-            onPressed: () => setState(() => _isProMode = !_isProMode),
-            icon: Icon(
-              _isProMode ? Icons.tune_rounded : Icons.auto_awesome_rounded,
-              color: _isProMode ? AppTheme.chargingCyan : AppTheme.accentGreen,
-              size: 16,
-            ),
-            label: Text(
-              _isProMode ? 'PRO' : 'CALM',
-              style: TextStyle(
-                color: _isProMode ? AppTheme.chargingCyan : AppTheme.accentGreen,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
           IconButton(
             icon: Icon(
-              Icons.security_rounded,
-              color: (_elevatedStatus['hasShizuku'] == true || _elevatedStatus['hasKadb'] == true)
+              _elevatedStatus['hasAnyElevatedAccess'] == true
+                  ? Icons.verified_user_rounded
+                  : Icons.shield_outlined,
+              color: _elevatedStatus['hasAnyElevatedAccess'] == true
                   ? AppTheme.accentGreen
                   : AppTheme.amber,
               size: 20,
@@ -274,43 +256,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 children: [
-                  if (!_isProMode) ...[
-                    // --- CALM MINIMALIST VIEW ---
-                    _buildCalmOverview(sample),
-                    const SizedBox(height: 16),
-                    _buildHumanDiagnosisCard(sample),
-                    const SizedBox(height: 16),
-                    _buildProcessUsageSection(),
-                    const SizedBox(height: 16),
-                  ] else ...[
-                    // --- PRO DIAGNOSTICS VIEW ---
-                    CurrentGauge(
-                      currentMa: sample.currentMilliamps,
-                      isCharging: sample.isCharging,
-                    ),
-                    const SizedBox(height: 12),
-                    MetricChips(
-                      batteryLevel: sample.batteryLevel,
-                      isCharging: sample.isCharging,
-                      temperatureCelsius: sample.temperatureCelsius,
-                      voltageMv: sample.voltageMv,
-                      isScreenOn: sample.isScreenOn,
-                      hasElevatedAccess: _elevatedStatus['hasAnyElevatedAccess'] == true,
-                      elevatedBackend: (_elevatedStatus['hasKadb'] == true)
-                          ? ElevatedBackendType.kadb
-                          : ((_elevatedStatus['hasShizukuPermission'] == true)
-                              ? ElevatedBackendType.shizuku
-                              : ElevatedBackendType.none),
-                      onTapElevated: _showPairingModal,
-                    ),
-                    const SizedBox(height: 16),
-                    DrainTimelineChart(samples: _history),
-                    const SizedBox(height: 16),
+                  // Battery Guru Hero Card
+                  _buildBatteryGuruHeroCard(sample),
+                  const SizedBox(height: 12),
 
-                    // Top Active Processes / Resource Eaters Section
-                    _buildProcessUsageSection(),
-                    const SizedBox(height: 16),
-                  ],
+                  // 3-Metric Clean Telemetry Ribbon (Current mA, Temp °C, Voltage V)
+                  _buildTelemetryRibbon(sample),
+                  const SizedBox(height: 16),
+
+                  // Discharge Timeline
+                  DrainTimelineChart(samples: _history),
+                  const SizedBox(height: 16),
+
+                  // Active Process Consumption Section
+                  _buildProcessUsageSection(),
+                  const SizedBox(height: 16),
 
                   // Sentinel Log Header with Clear All Action
                   Row(
@@ -604,58 +564,122 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Calm human-friendly hero overview
-  Widget _buildCalmOverview(TelemetrySample sample) {
+  Widget _buildBatteryGuruHeroCard(TelemetrySample sample) {
     final isCharging = sample.isCharging;
     final level = sample.batteryLevel;
-    final hoursRemaining = isCharging ? 0.6 : (level * 0.22); // Estimator
+    final absMa = sample.currentMilliamps.abs();
+    final hoursRemaining = isCharging ? 0.8 : (level * 0.22);
+
+    final statusColor = isCharging
+        ? AppTheme.chargingCyan
+        : (absMa > 850
+            ? AppTheme.crimson
+            : (absMa > 650 ? AppTheme.amber : AppTheme.accentGreen));
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.surfaceBorder),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '$level',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 72,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -2.0,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '$level',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 56,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1.5,
+                            height: 1.0,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '%',
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      isCharging
+                          ? '⚡ Fast Charging · Full in ~${(hoursRemaining * 60).round()}m'
+                          : '🔋 Battery Healthy · ~${hoursRemaining.toStringAsFixed(1)}h remaining',
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const Text(
-                '%',
-                style: TextStyle(
-                  color: AppTheme.accentGreen,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+              InkWell(
+                onTap: _showPairingModal,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: (_elevatedStatus['hasAnyElevatedAccess'] == true)
+                        ? AppTheme.accentGreen.withOpacity(0.12)
+                        : AppTheme.amber.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: (_elevatedStatus['hasAnyElevatedAccess'] == true)
+                          ? AppTheme.accentGreen.withOpacity(0.3)
+                          : AppTheme.amber.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        (_elevatedStatus['hasAnyElevatedAccess'] == true)
+                            ? Icons.verified_user_rounded
+                            : Icons.link_rounded,
+                        size: 14,
+                        color: (_elevatedStatus['hasAnyElevatedAccess'] == true)
+                            ? AppTheme.accentGreen
+                            : AppTheme.amber,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        (_elevatedStatus['hasKadb'] == true)
+                            ? 'KADB'
+                            : ((_elevatedStatus['hasShizukuPermission'] == true) ? 'SHIZUKU' : 'UNPAIRED'),
+                        style: TextStyle(
+                          color: (_elevatedStatus['hasAnyElevatedAccess'] == true)
+                              ? AppTheme.accentGreen
+                              : AppTheme.amber,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            isCharging
-                ? '⚡ Fast Charging · Full in ~${(hoursRemaining * 60).round()} min'
-                : '🔋 Healthy · About ${hoursRemaining.round()} hours left',
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Clean progress bar
+          const SizedBox(height: 18),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
@@ -674,48 +698,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Plain human diagnosis card
-  Widget _buildHumanDiagnosisCard(TelemetrySample sample) {
+  Widget _buildTelemetryRibbon(TelemetrySample sample) {
     final absMa = sample.currentMilliamps.abs();
-    final bool isHighDrain = !sample.isCharging && absMa > 450;
+    final isCharging = sample.isCharging;
+    final volts = (sample.voltageMv / 1000.0).toStringAsFixed(2);
+
+    final currentLabel = isCharging ? '+$absMa mA' : '-$absMa mA';
+    final currentColor = isCharging
+        ? AppTheme.chargingCyan
+        : (absMa > 850 ? AppTheme.crimson : (absMa > 650 ? AppTheme.amber : AppTheme.chargingCyan));
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: isHighDrain ? AppTheme.crimson.withOpacity(0.12) : AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isHighDrain ? AppTheme.crimson.withOpacity(0.4) : AppTheme.surfaceBorder,
-        ),
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.surfaceBorder),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Icon(
-            isHighDrain ? Icons.warning_rounded : Icons.check_circle_rounded,
-            color: isHighDrain ? AppTheme.crimson : AppTheme.accentGreen,
-            size: 26,
+          _buildRibbonItem(
+            icon: Icons.speed_rounded,
+            color: currentColor,
+            label: 'CURRENT',
+            value: currentLabel,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isHighDrain ? 'Drain Higher Than Normal' : 'Standby Drain is Low',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isHighDrain
-                      ? 'Phone is using $absMa mA right now. Tap PRO to trace culprit apps.'
-                      : 'Display and apps sleeping soundly. Sentinel is monitoring.',
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                ),
-              ],
-            ),
+          Container(width: 1, height: 32, color: AppTheme.surfaceBorder),
+          _buildRibbonItem(
+            icon: Icons.thermostat_rounded,
+            color: sample.temperatureCelsius >= 38.0 ? AppTheme.amber : AppTheme.accentGreen,
+            label: 'TEMP',
+            value: '${sample.temperatureCelsius.toStringAsFixed(1)}°C',
+          ),
+          Container(width: 1, height: 32, color: AppTheme.surfaceBorder),
+          _buildRibbonItem(
+            icon: Icons.electric_bolt_rounded,
+            color: AppTheme.amber,
+            label: 'VOLTAGE',
+            value: '${volts}V',
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRibbonItem({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }
