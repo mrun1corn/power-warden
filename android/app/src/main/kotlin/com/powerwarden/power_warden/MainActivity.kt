@@ -224,6 +224,21 @@ class MainActivity : FlutterActivity() {
                         result.success(success)
                     }
                 }
+                "getSharedPrefBool" -> {
+                    val key = call.argument<String>("key") ?: ""
+                    val defaultVal = call.argument<Boolean>("default") ?: false
+                    val prefs = getSharedPreferences("power_warden_ui", android.content.Context.MODE_PRIVATE)
+                    result.success(prefs.getBoolean(key, defaultVal))
+                }
+                "setSharedPrefBool" -> {
+                    val key = call.argument<String>("key") ?: ""
+                    val value = call.argument<Boolean>("value") ?: false
+                    getSharedPreferences("power_warden_ui", android.content.Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean(key, value)
+                        .apply()
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }

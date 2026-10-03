@@ -186,6 +186,32 @@ class TelemetryService {
     }
   }
 
+  /// Reads a boolean from native SharedPreferences.
+  Future<bool> getPrefBool(String key, {bool defaultValue = false}) async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('getSharedPrefBool', {
+        'key': key,
+        'default': defaultValue,
+      });
+      return res ?? defaultValue;
+    } catch (_) {
+      return defaultValue;
+    }
+  }
+
+  /// Writes a boolean to native SharedPreferences.
+  Future<bool> setPrefBool(String key, bool value) async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('setSharedPrefBool', {
+        'key': key,
+        'value': value,
+      });
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Subscribes to live stream of hardware telemetry samples.
   Stream<TelemetrySample> get telemetryStream {
     _sampleStream ??= _eventChannel

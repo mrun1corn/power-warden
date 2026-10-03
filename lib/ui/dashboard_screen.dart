@@ -99,7 +99,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
       });
     });
 
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _checkElevatedWarning();
+    }
+  }
+
+  Future<void> _checkElevatedWarning() async {
+    final hasPrompted = await _telemetryService.getPrefBool('has_prompted_unpaired_warning', defaultValue: false);
+    if (!hasPrompted && _elevatedStatus['hasAnyElevatedAccess'] != true && mounted) {
+      // Delay slightly for smooth transition into view
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      _showUnpairedWarningDialog();
+    }
+  }
+
+  void _showUnpairedWarningDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AppTheme.amber.withOpacity(0.4), width: 1),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.amber.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.warning_amber_rounded, color: AppTheme.amber, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Privileges Needed',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'PowerWarden is currently running in baseline mode.\n\nWithout Shizuku or Wireless ADB pairing, Android prevents the app from identifying other background processes or force-stopping runaway battery drains.',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await _telemetryService.setPrefBool('has_prompted_unpaired_warning', true);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Remind Later', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await _telemetryService.setPrefBool('has_prompted_unpaired_warning', true);
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                _showPairingModal();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.amber,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text('Pair Now', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
