@@ -70,12 +70,18 @@ class PrivilegedExecutor(private val context: Context) {
 
     /**
      * Executes real SPAKE2 TLS pairing protocol with Android Wireless Debugging,
-     * and automatically connects to the active connection port once paired.
+     * persists paired status, and automatically connects to the active connection port once paired.
      */
     suspend fun pairKadb(pairingPort: Int, code: String, connectPort: Int? = null): Boolean = withContext(Dispatchers.IO) {
         try {
             // 1. Execute SPAKE2 cryptographic key exchange on pairing port
             com.flyfishxu.kadb.Kadb.pair("127.0.0.1", pairingPort, code)
+
+            // Save persistent pairing record in SharedPreferences
+            context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("is_kadb_paired", true)
+                .apply()
 
             // 2. Connect to the active debugging session port if available
             if (connectPort != null && connectPort > 0) {
@@ -96,14 +102,23 @@ class PrivilegedExecutor(private val context: Context) {
         try {
             activeKadb = com.flyfishxu.kadb.Kadb.create("127.0.0.1", port)
             val resp = activeKadb?.shell("echo ping")
-            resp?.exitCode == 0
+            val ok = resp?.exitCode == 0
+            if (ok) {
+                context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("is_kadb_paired", true)
+                    .apply()
+            }
+            ok
         } catch (_: Exception) {
             false
         }
     }
 
     fun hasKadbConnected(): Boolean {
-        return activeKadb != null
+        if (activeKadb != null) return true
+        val prefs = context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
+        return prefs.getBoolean("is_kadb_paired", false)
     }
 
     /**

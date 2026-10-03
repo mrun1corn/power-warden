@@ -10,16 +10,16 @@ class AnomalyEngine {
   double _baselineIdleMa = 80.0;
   static const double _alpha = 0.05;
 
-  // Sliding window of screen-off samples
-  final List<TelemetrySample> _screenOffBuffer = [];
-  static const int _consecutiveSpikeThreshold = 3;
+  // Sliding window of samples
+  final List<TelemetrySample> _recentSamples = [];
+  static const int _consecutiveSpikeThreshold = 2; // Trigger faster (2 ticks = 10s)
 
   double get baselineIdleMa => _baselineIdleMa;
 
   /// Updates baseline idle current using Exponentially Weighted Moving Average (EWMA)
-  /// when the device is confirmed idle and screen-off.
+  /// when the device is confirmed idle.
   void updateBaseline(int currentMa, bool isScreenOn, bool isCharging) {
-    if (!isScreenOn && !isCharging && currentMa > 0 && currentMa < 250) {
+    if (!isCharging && currentMa > 0 && currentMa < 250) {
       _baselineIdleMa = (_alpha * currentMa) + ((1.0 - _alpha) * _baselineIdleMa);
     }
   }
@@ -28,19 +28,13 @@ class AnomalyEngine {
   /// Returns an [AnomalyIncident] if an anomaly trigger is met, otherwise null.
   AnomalyIncident? evaluateSample(TelemetrySample sample) {
     if (sample.isCharging) {
-      _screenOffBuffer.clear();
+      _recentSamples.clear();
       return null;
     }
 
-    if (sample.isScreenOn) {
-      _screenOffBuffer.clear();
-      return null;
-    }
-
-    // Device is on battery and screen is OFF
-    _screenOffBuffer.add(sample);
-    if (_screenOffBuffer.length > 10) {
-      _screenOffBuffer.removeAt(0);
+    _recentSamples.add(sample);
+    if (_recentSamples.length > 15) {
+      _recentSamples.removeAt(0);
     }
 
     updateBaseline(sample.currentMilliamps, sample.isScreenOn, sample.isCharging);
@@ -54,37 +48,37 @@ class AnomalyEngine {
         peakCurrentMa: sample.currentMilliamps,
         maxTemperatureCelsius: sample.temperatureCelsius,
         culpritThread: 'Stuck CPU Core / Heavy Worker',
-        diagnosis: 'Sustained severe discharge (${sample.currentMilliamps}mA) with thermal throttling. A background loop is spinning an entire CPU core.',
+        diagnosis: 'Sustained severe discharge (${sample.currentMilliamps}mA) with thermal elevation. High power burn.',
         recommendedAction: 'Inspect active threads or restart device',
       );
     }
 
-    // Heuristic 2: Screen-off runaway drain over consecutive samples
-    if (_screenOffBuffer.length >= _consecutiveSpikeThreshold) {
-      final recentSamples = _screenOffBuffer.sublist(_screenOffBuffer.length - _consecutiveSpikeThreshold);
-      final allSpiking = recentSamples.every((s) => s.currentMilliamps >= 400);
+    // Heuristic 2: Active or Screen-Off Runaway Drain (>350mA)
+    if (_recentSamples.length >= _consecutiveSpikeThreshold) {
+      final window = _recentSamples.sublist(_recentSamples.length - _consecutiveSpikeThreshold);
+      final allSpiking = window.every((s) => s.currentMilliamps >= 350);
 
       if (allSpiking) {
-        final peakMa = recentSamples.map((s) => s.currentMilliamps).reduce(max);
-        final maxTemp = recentSamples.map((s) => s.temperatureCelsius).reduce(max);
+        final peakMa = window.map((s) => s.currentMilliamps).reduce(max);
+        final maxTemp = window.map((s) => s.temperatureCelsius).reduce(max);
 
-        if (peakMa >= 600) {
+        if (peakMa >= 550) {
           return AnomalyIncident(
-            startTime: recentSamples.first.timestamp,
+            startTime: window.first.timestamp,
             severity: AnomalySeverity.moderate,
             peakCurrentMa: peakMa,
             maxTemperatureCelsius: maxTemp,
-            diagnosis: 'High idle discharge sustained while display is sleeping (${peakMa}mA). A background service or wakelock is preventing deep sleep.',
-            recommendedAction: 'Check running services or isolate culprit package',
+            diagnosis: 'High discharge rate sustained (${peakMa}mA). A background service or wakelock is burning battery.',
+            recommendedAction: 'Check active app energy list',
           );
         } else {
           return AnomalyIncident(
-            startTime: recentSamples.first.timestamp,
+            startTime: window.first.timestamp,
             severity: AnomalySeverity.mild,
             peakCurrentMa: peakMa,
             maxTemperatureCelsius: maxTemp,
-            diagnosis: 'Elevated screen-off drain (${peakMa}mA vs baseline ${_baselineIdleMa.round()}mA). Background sync or sensor active.',
-            recommendedAction: 'Monitor background sync frequency',
+            diagnosis: 'Elevated power drain (${peakMa}mA vs baseline ${_baselineIdleMa.round()}mA). App activity detected.',
+            recommendedAction: 'Monitor background sync',
           );
         }
       }

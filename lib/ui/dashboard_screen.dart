@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../domain/anomaly_engine.dart';
 import '../domain/models/anomaly_incident.dart';
 import '../domain/models/telemetry_sample.dart';
+import '../data/database/database.dart';
 import '../services/notification_service.dart';
 import '../services/telemetry_service.dart';
 import 'theme.dart';
@@ -23,6 +24,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final TelemetryService _telemetryService = TelemetryService();
   final AnomalyEngine _anomalyEngine = AnomalyEngine();
   final NotificationService _notificationService = NotificationService();
+  final AppDatabase _database = AppDatabase();
 
   TelemetrySample? _currentSample;
   final List<TelemetrySample> _history = [];
@@ -44,6 +46,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _initApp() async {
     await _notificationService.initialize();
+    await _database.initialize();
+
+    // Load saved historical samples and anomalies from disk
+    final savedSamples = await _database.getRecentTelemetry(limit: 60);
+    if (savedSamples.isNotEmpty) {
+      _history.addAll(savedSamples);
+    }
+
     _elevatedStatus = await _telemetryService.getElevatedStatus();
     _currentSample = await _telemetryService.getInstantMetrics();
     await _telemetryService.startForegroundService();
@@ -68,9 +78,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _history.add(sample);
         if (_history.length > 60) _history.removeAt(0);
 
+        _database.bufferSample(sample);
+
         final incident = _anomalyEngine.evaluateSample(sample);
         if (incident != null) {
           _incidents.insert(0, incident);
+          _database.recordAnomaly(incident);
           _notificationService.showAnomalyNotification(incident);
         }
       });

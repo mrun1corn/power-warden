@@ -56,6 +56,12 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        mdnsDiscovery.onConnectPortDiscovered = { port ->
+            activityScope.launch {
+                privilegedExecutor.connectKadb(port)
+            }
+        }
+
         thermalObserver.start()
         screenObserver.start()
 
