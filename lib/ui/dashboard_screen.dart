@@ -509,18 +509,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           )
         else
-          Container(
-            decoration: BoxDecoration(
-              color: surfaceColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: surfaceBorder),
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _topProcesses.length,
-              separatorBuilder: (_, _) => Divider(height: 1, color: surfaceBorder),
-              itemBuilder: (context, idx) {
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _topProcesses.length,
+            itemBuilder: (context, idx) {
                 final proc = _topProcesses[idx];
                 final name = (proc['name'] as String?) ?? 'App';
                 final pkg = (proc['packageName'] as String?) ?? '';
@@ -563,7 +556,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final stateLabel = isCriticalCpu ? 'CRITICAL' : (isHeavy ? 'HEAVY' : 'CALM');
 
                 return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: cardBg,
@@ -759,7 +752,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 );
               },
             ),
-          ),
       ],
     );
   }
@@ -806,30 +798,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              '$level',
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 56,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -1.5,
-                                height: 1.0,
-                              ),
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '%',
-                              style: TextStyle(
-                                color: statusColor,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          '$level%',
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 52,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1.5,
+                            height: 1.0,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Container(
@@ -850,15 +827,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      isCharging
-                          ? '⚡ Fast Charging · Full in ~${(hoursRemaining * 60).round()}m'
-                          : '🔋 Battery Healthy · ~${hoursRemaining.toStringAsFixed(1)}h remaining',
-                      style: TextStyle(
-                        color: textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    Row(
+                      children: [
+                        Icon(
+                          isCharging ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
+                          size: 16,
+                          color: statusColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          isCharging
+                              ? 'Fast Charging · Full in ~${(hoursRemaining * 60).round()}m'
+                              : 'Battery Healthy · ~${hoursRemaining.toStringAsFixed(1)}h remaining',
+                          style: TextStyle(
+                            color: textMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -12,18 +12,23 @@ class DrainTimelineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight;
+    final surfaceBorder = isDark ? AppTheme.surfaceBorderDark : AppTheme.surfaceBorderLight;
+    final textMuted = isDark ? AppTheme.textMuted : AppTheme.textMutedLight;
+
     if (samples.isEmpty) {
       return Container(
         height: 220,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          color: surfaceColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.surfaceBorder),
+          border: Border.all(color: surfaceBorder),
         ),
-        child: const Text(
+        child: Text(
           'Collecting battery telemetry...',
-          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+          style: TextStyle(color: textMuted, fontSize: 13),
         ),
       );
     }
@@ -53,9 +58,9 @@ class DrainTimelineChart extends StatelessWidget {
       height: 240,
       padding: const EdgeInsets.only(top: 16, bottom: 12, right: 16, left: 4),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceBorder),
+        border: Border.all(color: surfaceBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,13 +70,13 @@ class DrainTimelineChart extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'DISCHARGE TIMELINE',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.0,
-                    color: AppTheme.textSecondary,
+                    color: textMuted,
                   ),
                 ),
                   // Legend with Clear Labels
@@ -80,7 +85,7 @@ class DrainTimelineChart extends StatelessWidget {
                     children: [
                       Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppTheme.chargingCyan, shape: BoxShape.circle)),
                       const SizedBox(width: 4),
-                      const Text('Discharge / Charge Rate (mA)', style: TextStyle(color: AppTheme.textMuted, fontSize: 10)),
+                      Text('Flow Rate (mA)', style: TextStyle(color: textMuted, fontSize: 10)),
                     ],
                   ),
               ],
@@ -96,7 +101,7 @@ class DrainTimelineChart extends StatelessWidget {
                   show: true,
                   drawVerticalLine: false,
                   getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppTheme.surfaceBorder.withOpacity(0.4),
+                    color: surfaceBorder,
                     strokeWidth: 1,
                     dashArray: [4, 4],
                   ),
@@ -104,7 +109,22 @@ class DrainTimelineChart extends StatelessWidget {
                 titlesData: FlTitlesData(
                   rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 22,
+                      interval: (samples.length > 20 ? (samples.length / 3.0) : 10.0),
+                      getTitlesWidget: (val, meta) {
+                        final idx = val.toInt();
+                        if (idx == 0) {
+                          return Text('-${(samples.length * 2) ~/ 60}m', style: TextStyle(color: textMuted, fontSize: 9));
+                        } else if (idx >= samples.length - 1) {
+                          return Text('Now', style: TextStyle(color: textMuted, fontSize: 9, fontWeight: FontWeight.bold));
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -116,7 +136,7 @@ class DrainTimelineChart extends StatelessWidget {
                         }
                         return Text(
                           '${val.toInt()} mA',
-                          style: const TextStyle(color: AppTheme.textMuted, fontSize: 9, fontWeight: FontWeight.w600),
+                          style: TextStyle(color: textMuted, fontSize: 9, fontWeight: FontWeight.w600),
                         );
                       },
                     ),
