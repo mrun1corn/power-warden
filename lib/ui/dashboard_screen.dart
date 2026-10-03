@@ -90,7 +90,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (incident != null) {
           _incidents.insert(0, incident);
           _database.recordAnomaly(incident);
-          _notificationService.showAnomalyNotification(incident);
+
+          // Only notify when urgent or when alert cooldown has elapsed
+          if (_anomalyEngine.shouldAlertNotification(incident)) {
+            _notificationService.showAnomalyNotification(incident);
+          }
         }
       });
     });

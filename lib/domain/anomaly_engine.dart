@@ -3,8 +3,11 @@ import 'models/anomaly_incident.dart';
 import 'models/telemetry_sample.dart';
 
 /// Heuristic Anomaly Detection Engine.
-/// Analyzes real-time and background telemetry samples to flag runaway drain loops,
-/// thermal throttling spikes, and unreleased wakelocks.
+/// Distinguishes between:
+/// 1. Real-time incident detection & logging (NEVER capped or dropped).
+/// 2. Notification alerting with urgency escalation:
+///    - Critical emergencies (overheating / thermal danger) ALERT IMMEDIATELY.
+///    - Moderate / mild anomalies use a 3-minute alert cooldown so notifications don't buzz continuously.
 class AnomalyEngine {
   // EWMA Baseline current estimation
   double _baselineIdleMa = 80.0;
@@ -12,24 +15,23 @@ class AnomalyEngine {
 
   // Sliding window of samples
   final List<TelemetrySample> _recentSamples = [];
-  static const int _consecutiveSpikeThreshold = 2; // Trigger faster (2 ticks = 10s)
+  static const int _consecutiveSpikeThreshold = 2; // 2 ticks = 10s
 
   double get baselineIdleMa => _baselineIdleMa;
 
   /// Updates baseline idle current using Exponentially Weighted Moving Average (EWMA)
-  /// when the device is confirmed idle.
   void updateBaseline(int currentMa, bool isScreenOn, bool isCharging) {
     if (!isCharging && currentMa > 0 && currentMa < 250) {
       _baselineIdleMa = (_alpha * currentMa) + ((1.0 - _alpha) * _baselineIdleMa);
     }
   }
 
-  // Cooldown timer to prevent repetitive notification buzzing
-  DateTime? _lastNotificationTime;
-  static const Duration _notificationCooldown = Duration(minutes: 15);
+  DateTime? _lastAlertNotificationTime;
+  AnomalySeverity? _lastAlertSeverity;
+  static const Duration _nonCriticalAlertCooldown = Duration(minutes: 3);
 
   /// Evaluates an incoming sample for drain anomalies.
-  /// Returns an [AnomalyIncident] if an anomaly trigger is met, otherwise null.
+  /// Logs incidents to the Sentinel Log and decides whether to post a notification alert.
   AnomalyIncident? evaluateSample(TelemetrySample sample) {
     if (sample.isCharging) {
       _recentSamples.clear();
@@ -43,14 +45,9 @@ class AnomalyEngine {
 
     updateBaseline(sample.currentMilliamps, sample.isScreenOn, sample.isCharging);
 
-    final now = DateTime.now();
-    final bool canNotify = _lastNotificationTime == null || now.difference(_lastNotificationTime!) > _notificationCooldown;
-
-    // Heuristic 1: Critical Thermal + Heavy Current Spike
-    // Current > 750mA with thermal status >= 2 (MODERATE) or temp > 38.5C
+    // --- Heuristic 1: Critical Thermal + Heavy Current Spike ---
+    // Immediate danger: Current >= 750mA and thermal status >= 2 or temp >= 38.5C
     if (sample.currentMilliamps >= 750 && (sample.thermalStatus >= 2 || sample.temperatureCelsius >= 38.5)) {
-      if (!canNotify) return null;
-      _lastNotificationTime = now;
       return AnomalyIncident(
         startTime: sample.timestamp,
         severity: AnomalySeverity.critical,
@@ -62,16 +59,14 @@ class AnomalyEngine {
       );
     }
 
-    // Heuristic 2: Active or Screen-Off Runaway Drain (>450mA sustained)
+    // --- Heuristic 2: Active or Screen-Off Runaway Drain (>450mA sustained) ---
     if (_recentSamples.length >= _consecutiveSpikeThreshold) {
       final window = _recentSamples.sublist(_recentSamples.length - _consecutiveSpikeThreshold);
       final allSpiking = window.every((s) => s.currentMilliamps >= 450);
 
-      if (allSpiking && canNotify) {
+      if (allSpiking) {
         final peakMa = window.map((s) => s.currentMilliamps).reduce(max);
         final maxTemp = window.map((s) => s.temperatureCelsius).reduce(max);
-
-        _lastNotificationTime = now;
 
         if (peakMa >= 650) {
           return AnomalyIncident(
@@ -96,5 +91,36 @@ class AnomalyEngine {
     }
 
     return null;
+  }
+
+  /// Evaluates whether an [AnomalyIncident] warrants buzzing the user's notification bar right now.
+  /// - CRITICAL (overheating, severe burn): ALWAYS alerts instantly (bypasses cooldown).
+  /// - MODERATE / MILD: Alerts immediately if severity escalated, or throttles to 3-min cooldown.
+  bool shouldAlertNotification(AnomalyIncident incident) {
+    final now = DateTime.now();
+
+    // Critical incidents always alert immediately
+    if (incident.severity == AnomalySeverity.critical) {
+      _lastAlertNotificationTime = now;
+      _lastAlertSeverity = incident.severity;
+      return true;
+    }
+
+    // If escalating from mild to moderate, alert immediately
+    if (_lastAlertSeverity == AnomalySeverity.mild && incident.severity == AnomalySeverity.moderate) {
+      _lastAlertNotificationTime = now;
+      _lastAlertSeverity = incident.severity;
+      return true;
+    }
+
+    // Check 3-minute cooldown for repeated non-critical alerts
+    if (_lastAlertNotificationTime == null ||
+        now.difference(_lastAlertNotificationTime!) >= _nonCriticalAlertCooldown) {
+      _lastAlertNotificationTime = now;
+      _lastAlertSeverity = incident.severity;
+      return true;
+    }
+
+    return false;
   }
 }
