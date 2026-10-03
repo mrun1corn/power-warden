@@ -242,10 +242,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
+          // Elevated Settings icon (only when unpaired or needed)
           IconButton(
             icon: Icon(
               _elevatedStatus['hasAnyElevatedAccess'] == true
-                  ? Icons.verified_user_rounded
+                  ? Icons.shield_rounded
                   : Icons.shield_outlined,
               color: _elevatedStatus['hasAnyElevatedAccess'] == true
                   ? AppTheme.accentGreen
@@ -591,9 +592,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final statusColor = isCharging
         ? AppTheme.chargingCyan
-        : (absMa > 850
+        : (absMa > 1200
             ? AppTheme.crimson
-            : (absMa > 650 ? AppTheme.amber : AppTheme.accentGreen));
+            : (absMa > 850 ? AppTheme.amber : AppTheme.accentGreen));
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -651,53 +652,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
-              InkWell(
-                onTap: _showPairingModal,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: (_elevatedStatus['hasAnyElevatedAccess'] == true)
-                        ? AppTheme.accentGreen.withOpacity(0.12)
-                        : AppTheme.amber.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: (_elevatedStatus['hasAnyElevatedAccess'] == true)
-                          ? AppTheme.accentGreen.withOpacity(0.3)
-                          : AppTheme.amber.withOpacity(0.3),
+              if (_elevatedStatus['hasAnyElevatedAccess'] != true)
+                InkWell(
+                  onTap: _showPairingModal,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.amber.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.amber.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.link_rounded, size: 14, color: AppTheme.amber),
+                        SizedBox(width: 5),
+                        Text(
+                          'SET UP ACCESS',
+                          style: TextStyle(
+                            color: AppTheme.amber,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        (_elevatedStatus['hasAnyElevatedAccess'] == true)
-                            ? Icons.verified_user_rounded
-                            : Icons.link_rounded,
-                        size: 14,
-                        color: (_elevatedStatus['hasAnyElevatedAccess'] == true)
-                            ? AppTheme.accentGreen
-                            : AppTheme.amber,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        (_elevatedStatus['hasPermanentAdb'] == true)
-                            ? 'ADB GRANTED'
-                            : ((_elevatedStatus['hasKadb'] == true)
-                                ? 'KADB'
-                                : ((_elevatedStatus['hasShizukuPermission'] == true) ? 'SHIZUKU' : 'UNPAIRED')),
-                        style: TextStyle(
-                          color: (_elevatedStatus['hasAnyElevatedAccess'] == true)
-                              ? AppTheme.accentGreen
-                              : AppTheme.amber,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -727,7 +710,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final currentLabel = isCharging ? '+$absMa mA' : '-$absMa mA';
     final currentColor = isCharging
         ? AppTheme.chargingCyan
-        : (absMa > 850 ? AppTheme.crimson : (absMa > 650 ? AppTheme.amber : AppTheme.chargingCyan));
+        : (absMa > 1200 ? AppTheme.crimson : (absMa > 850 ? AppTheme.amber : AppTheme.chargingCyan));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

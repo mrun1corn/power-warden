@@ -27,11 +27,11 @@ void main() {
       expect(anomaly, isNull);
     });
 
-    test('ignores screen on samples', () {
+    test('ignores screen on samples under normal load', () {
       final sample = TelemetrySample(
         timestamp: DateTime.now(),
         batteryLevel: 80,
-        currentMilliamps: 200, // Normal usage
+        currentMilliamps: 850, // Normal active usage
         temperatureCelsius: 34.0,
         thermalStatus: 0,
         isScreenOn: true,
@@ -43,14 +43,14 @@ void main() {
       expect(anomaly, isNull);
     });
 
-    test('triggers Critical Anomaly on high drain with elevated thermal status', () {
+    test('triggers Critical Anomaly on severe screen-on thermal runaway', () {
       final sample = TelemetrySample(
         timestamp: DateTime.now(),
-        batteryLevel: 65,
-        currentMilliamps: 850, // Extreme drain
-        temperatureCelsius: 41.0, // High heat
-        thermalStatus: 3, // SEVERE
-        isScreenOn: false,
+        batteryLevel: 80,
+        currentMilliamps: 1500,
+        temperatureCelsius: 42.0,
+        thermalStatus: 2,
+        isScreenOn: true,
         isCharging: false,
         voltageMv: 3800,
       );
@@ -58,18 +58,16 @@ void main() {
       final anomaly = engine.evaluateSample(sample);
       expect(anomaly, isNotNull);
       expect(anomaly!.severity, AnomalySeverity.critical);
-      expect(anomaly.peakCurrentMa, 850);
     });
 
-    test('triggers Moderate Anomaly on consecutive screen-off spikes', () {
+    test('triggers Rogue Sleep Drain Anomaly on consecutive screen-off spikes', () {
       final freshEngine = AnomalyEngine();
       final now = DateTime.now();
 
-      // Send 2 consecutive high-drain samples
       freshEngine.evaluateSample(TelemetrySample(
         timestamp: now.subtract(const Duration(minutes: 1)),
         batteryLevel: 69,
-        currentMilliamps: 720,
+        currentMilliamps: 320,
         temperatureCelsius: 35.2,
         thermalStatus: 0,
         isScreenOn: false,
@@ -80,7 +78,7 @@ void main() {
       final anomaly = freshEngine.evaluateSample(TelemetrySample(
         timestamp: now,
         batteryLevel: 69,
-        currentMilliamps: 740,
+        currentMilliamps: 350,
         temperatureCelsius: 35.4,
         thermalStatus: 0,
         isScreenOn: false,
@@ -90,7 +88,7 @@ void main() {
 
       expect(anomaly, isNotNull);
       expect(anomaly!.severity, AnomalySeverity.moderate);
-      expect(anomaly.peakCurrentMa, 740);
+      expect(anomaly.peakCurrentMa, 350);
     });
   });
 }

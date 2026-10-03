@@ -27,7 +27,9 @@ class AnomalyEngine {
   }
 
   /// Evaluates an incoming sample for drain anomalies.
-  /// Logs incidents to the Sentinel Log and decides whether to post a notification alert.
+  /// Dynamically calibrated for real Android hardware:
+  /// - SCREEN ON: 300-800mA is normal usage. Heavy games/video can hit 900-1400mA.
+  /// - SCREEN OFF: Should be resting idle (15-60mA). Sustained drain >250mA asleep is a rogue wakelock!
   AnomalyIncident? evaluateSample(TelemetrySample sample) {
     if (sample.isCharging) {
       _recentSamples.clear();
@@ -41,40 +43,46 @@ class AnomalyEngine {
 
     updateBaseline(sample.currentMilliamps, sample.isScreenOn, sample.isCharging);
 
-    // --- Heuristic 1: Critical Thermal + Heavy Current Spike ---
-    // Immediate danger: Current >= 750mA and thermal status >= 2 or temp >= 38.5C
-    if (sample.currentMilliamps >= 750 && (sample.thermalStatus >= 2 || sample.temperatureCelsius >= 38.5)) {
+    // --- Scenario A: Device is ASLEEP (Screen OFF) ---
+    // A sleeping phone should NEVER draw 300mA+ continuously unless an app is holding an unreleased wakelock.
+    if (!sample.isScreenOn) {
+      if (_recentSamples.length >= _consecutiveSpikeThreshold) {
+        final window = _recentSamples.sublist(_recentSamples.length - _consecutiveSpikeThreshold);
+        final allSpiking = window.every((s) => !s.isScreenOn && s.currentMilliamps >= 280);
+
+        if (allSpiking) {
+          final peakMa = window.map((s) => s.currentMilliamps).reduce(max);
+          final maxTemp = window.map((s) => s.temperatureCelsius).reduce(max);
+
+          // Critical sleep drain: Screen off but drawing 550mA+ or heating up
+          final isCriticalSleep = peakMa >= 550 || maxTemp >= 38.0;
+
+          return AnomalyIncident(
+            startTime: window.first.timestamp,
+            severity: isCriticalSleep ? AnomalySeverity.critical : AnomalySeverity.moderate,
+            peakCurrentMa: peakMa,
+            maxTemperatureCelsius: maxTemp,
+            diagnosis: 'Rogue sleep drain ($peakMa mA while screen off). An app or wakelock is preventing deep sleep.',
+            recommendedAction: 'Check active app energy list',
+          );
+        }
+      }
+      return null;
+    }
+
+    // --- Scenario B: Device is AWAKE (Screen ON) ---
+    // Active screen (120Hz OLED, 5G, CPU) legitimately consumes 400-800mA.
+    // Only flag as CRITICAL emergency if sustained draw exceeds 1,400mA with high heat (thermal runaway).
+    if (sample.currentMilliamps >= 1400 && (sample.thermalStatus >= 2 || sample.temperatureCelsius >= 41.0)) {
       return AnomalyIncident(
         startTime: sample.timestamp,
         severity: AnomalySeverity.critical,
         peakCurrentMa: sample.currentMilliamps,
         maxTemperatureCelsius: sample.temperatureCelsius,
-        culpritThread: 'Stuck CPU Core / Heavy Worker',
-        diagnosis: 'Sustained severe discharge (${sample.currentMilliamps}mA) with thermal elevation. High power burn.',
-        recommendedAction: 'Inspect active threads or restart device',
+        culpritThread: 'Thermal Runaway Loop',
+        diagnosis: 'Severe active discharge (${sample.currentMilliamps} mA) with device overheating (${sample.temperatureCelsius}°C).',
+        recommendedAction: 'Inspect heavy 3D/CPU tasks or reboot',
       );
-    }
-
-    // --- Heuristic 2: Active or Screen-Off Runaway Drain (>450mA sustained) ---
-    if (_recentSamples.length >= _consecutiveSpikeThreshold) {
-      final window = _recentSamples.sublist(_recentSamples.length - _consecutiveSpikeThreshold);
-      final allSpiking = window.every((s) => s.currentMilliamps >= 500);
-
-      if (allSpiking) {
-        final peakMa = window.map((s) => s.currentMilliamps).reduce(max);
-        final maxTemp = window.map((s) => s.temperatureCelsius).reduce(max);
-
-        if (peakMa >= 700) {
-          return AnomalyIncident(
-            startTime: window.first.timestamp,
-            severity: AnomalySeverity.moderate,
-            peakCurrentMa: peakMa,
-            maxTemperatureCelsius: maxTemp,
-            diagnosis: 'High discharge rate sustained ($peakMa mA). A background service or wakelock is burning battery.',
-            recommendedAction: 'Check active app energy list',
-          );
-        }
-      }
     }
 
     return null;
