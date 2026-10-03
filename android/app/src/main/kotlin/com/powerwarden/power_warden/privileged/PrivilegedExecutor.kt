@@ -466,8 +466,12 @@ class PrivilegedExecutor(private val context: Context) {
         val hasKadbElevated = activeKadb != null
 
         if (!hasShizukuElevated && !hasKadbElevated) {
-            // Smart Fallback for unprivileged / zero-ADB state:
-            // Direct user to Android's native App Info screen so they can tap Force Stop with 1 click!
+            // Priority 1: Automated Accessibility Service (Zero-ADB, 100% automated 1-tap Force Stop)
+            if (com.powerwarden.power_warden.service.WardenAccessibilityService.isServiceRunning) {
+                return@withContext com.powerwarden.power_warden.service.WardenAccessibilityService.stopPackageAutomatically(packageName)
+            }
+
+            // Priority 2: Direct user to Android's native App Info screen so they can tap Force Stop with 1 click
             try {
                 withContext(Dispatchers.Main) {
                     val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {

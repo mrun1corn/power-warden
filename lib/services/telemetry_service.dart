@@ -188,6 +188,26 @@ class TelemetryService {
     }
   }
 
+  /// Opens Android Accessibility Settings.
+  Future<bool> openAccessibilitySettings() async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('openAccessibilitySettings');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Checks if Warden Accessibility Service is running.
+  Future<bool> isAccessibilityServiceActive() async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('isAccessibilityServiceActive');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Reads a boolean from native SharedPreferences.
   Future<bool> getPrefBool(String key, {bool defaultValue = false}) async {
     try {

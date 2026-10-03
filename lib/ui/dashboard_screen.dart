@@ -471,12 +471,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         InkWell(
                           onTap: () async {
                             final hasElevatedShell = _elevatedStatus['hasKadb'] == true || _elevatedStatus['hasShizukuPermission'] == true;
+                            final isAccessibilityOn = await _telemetryService.isAccessibilityServiceActive();
+
                             final ok = await _telemetryService.remediateApp(pkg);
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(ok
-                                      ? (hasElevatedShell
+                                      ? (hasElevatedShell || isAccessibilityOn
                                           ? '✓ Force-stopped $name'
                                           : 'Tap "Force Stop" on $name system info')
                                       : 'Could not open $name settings'),

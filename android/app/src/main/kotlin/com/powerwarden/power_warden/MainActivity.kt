@@ -229,6 +229,20 @@ class MainActivity : FlutterActivity() {
                         result.success(success)
                     }
                 }
+                "openAccessibilitySettings" -> {
+                    try {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (_: Exception) {
+                        result.success(false)
+                    }
+                }
+                "isAccessibilityServiceActive" -> {
+                    result.success(com.powerwarden.power_warden.service.WardenAccessibilityService.isServiceRunning)
+                }
                 "getSharedPrefBool" -> {
                     val key = call.argument<String>("key") ?: ""
                     val defaultVal = call.argument<Boolean>("default") ?: false
