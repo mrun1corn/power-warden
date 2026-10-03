@@ -22,7 +22,11 @@ class NotificationService {
     _initialized = true;
   }
 
-  Future<void> showAnomalyNotification(AnomalyIncident incident) async {
+  Future<void> showAnomalyNotification(
+    AnomalyIncident incident, {
+    String? topAppName,
+    double? topAppCpu,
+  }) async {
     const androidDetails = AndroidNotificationDetails(
       'power_warden_alerts',
       'PowerWarden Alerts',
@@ -33,8 +37,18 @@ class NotificationService {
     );
     const notificationDetails = NotificationDetails(android: androidDetails);
 
-    final title = '⚡ ${incident.severity.name.toUpperCase()} Idle Drain Detected';
-    final body = '${incident.peakCurrentMa}mA discharge rate. ${incident.diagnosis}';
+    final title = '⚡ Critical Battery Drain (${incident.peakCurrentMa} mA)';
+    final String body;
+
+    final culprit = incident.culpritPackage ?? incident.culpritThread;
+    if (culprit != null && culprit.isNotEmpty && !culprit.contains('Stuck CPU')) {
+      body = 'Rogue app: $culprit · Burning power in background.';
+    } else if (topAppName != null && topAppName.isNotEmpty) {
+      final cpuStr = topAppCpu != null && topAppCpu > 0 ? ' (${topAppCpu.toStringAsFixed(1)}% CPU)' : '';
+      body = 'Top Consumer: $topAppName$cpuStr · High power burn.';
+    } else {
+      body = '${incident.peakCurrentMa} mA sustained draw with thermal elevation.';
+    }
 
     await _notificationsPlugin.show(
       id: incident.hashCode,

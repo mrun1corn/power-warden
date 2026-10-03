@@ -88,9 +88,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _incidents.insert(0, incident);
           _database.recordAnomaly(incident);
 
-          // Only notify when urgent or when alert cooldown has elapsed
           if (_anomalyEngine.shouldAlertNotification(incident)) {
-            _notificationService.showAnomalyNotification(incident);
+            final topApp = _topProcesses.isNotEmpty ? _topProcesses.first : null;
+            final topName = topApp?['name'] as String?;
+            final topCpu = (topApp?['cpuPercent'] as num?)?.toDouble();
+
+            _notificationService.showAnomalyNotification(
+              incident,
+              topAppName: topName,
+              topAppCpu: topCpu,
+            );
           }
         }
       });
