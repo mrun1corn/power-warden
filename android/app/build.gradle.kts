@@ -30,6 +30,13 @@ android {
         versionName = flutter.versionName
     }
 
+    buildTypes {
+        release {
+            // Sign with default debug key so it can be installed immediately on test devices without 'App not installed' error
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
     configurations.all {
         resolutionStrategy.eachDependency {
             if (requested.group == "com.android.tools.build" && requested.name == "gradle") {
