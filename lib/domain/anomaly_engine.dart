@@ -24,6 +24,10 @@ class AnomalyEngine {
     }
   }
 
+  // Cooldown timer to prevent repetitive notification buzzing
+  DateTime? _lastNotificationTime;
+  static const Duration _notificationCooldown = Duration(minutes: 15);
+
   /// Evaluates an incoming sample for drain anomalies.
   /// Returns an [AnomalyIncident] if an anomaly trigger is met, otherwise null.
   AnomalyIncident? evaluateSample(TelemetrySample sample) {
@@ -39,9 +43,14 @@ class AnomalyEngine {
 
     updateBaseline(sample.currentMilliamps, sample.isScreenOn, sample.isCharging);
 
+    final now = DateTime.now();
+    final bool canNotify = _lastNotificationTime == null || now.difference(_lastNotificationTime!) > _notificationCooldown;
+
     // Heuristic 1: Critical Thermal + Heavy Current Spike
     // Current > 750mA with thermal status >= 2 (MODERATE) or temp > 38.5C
     if (sample.currentMilliamps >= 750 && (sample.thermalStatus >= 2 || sample.temperatureCelsius >= 38.5)) {
+      if (!canNotify) return null;
+      _lastNotificationTime = now;
       return AnomalyIncident(
         startTime: sample.timestamp,
         severity: AnomalySeverity.critical,
@@ -53,16 +62,18 @@ class AnomalyEngine {
       );
     }
 
-    // Heuristic 2: Active or Screen-Off Runaway Drain (>350mA)
+    // Heuristic 2: Active or Screen-Off Runaway Drain (>450mA sustained)
     if (_recentSamples.length >= _consecutiveSpikeThreshold) {
       final window = _recentSamples.sublist(_recentSamples.length - _consecutiveSpikeThreshold);
-      final allSpiking = window.every((s) => s.currentMilliamps >= 350);
+      final allSpiking = window.every((s) => s.currentMilliamps >= 450);
 
-      if (allSpiking) {
+      if (allSpiking && canNotify) {
         final peakMa = window.map((s) => s.currentMilliamps).reduce(max);
         final maxTemp = window.map((s) => s.temperatureCelsius).reduce(max);
 
-        if (peakMa >= 550) {
+        _lastNotificationTime = now;
+
+        if (peakMa >= 650) {
           return AnomalyIncident(
             startTime: window.first.timestamp,
             severity: AnomalySeverity.moderate,

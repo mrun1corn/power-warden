@@ -92,6 +92,25 @@ class AppDatabase {
     } catch (_) {}
   }
 
+  /// Retrieves recorded anomaly incidents for the Sentinel log.
+  Future<List<AnomalyIncident>> getRecentAnomalies({int limit = 50}) async {
+    final results = <AnomalyIncident>[];
+    if (_anomaliesFile != null && await _anomaliesFile!.exists()) {
+      try {
+        final lines = await _anomaliesFile!.readAsLines();
+        for (final line in lines.reversed) {
+          if (line.trim().isEmpty) continue;
+          try {
+            final map = jsonDecode(line) as Map<String, dynamic>;
+            results.add(AnomalyIncident.fromMap(map));
+            if (results.length >= limit) break;
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+    return results;
+  }
+
   /// Prunes telemetry records older than 48 hours to conserve disk space.
   Future<void> pruneOldTelemetry() async {
     if (_telemetryFile == null || !await _telemetryFile!.exists()) return;

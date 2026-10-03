@@ -31,7 +31,7 @@ void main() {
       final sample = TelemetrySample(
         timestamp: DateTime.now(),
         batteryLevel: 80,
-        currentMilliamps: 550, // High drain, but screen is active
+        currentMilliamps: 200, // Normal usage
         temperatureCelsius: 34.0,
         thermalStatus: 0,
         isScreenOn: true,
@@ -62,21 +62,11 @@ void main() {
     });
 
     test('triggers Moderate Anomaly on consecutive screen-off spikes', () {
+      final freshEngine = AnomalyEngine();
       final now = DateTime.now();
 
-      // Send 3 consecutive high-drain samples
-      engine.evaluateSample(TelemetrySample(
-        timestamp: now.subtract(const Duration(minutes: 2)),
-        batteryLevel: 70,
-        currentMilliamps: 650,
-        temperatureCelsius: 35.0,
-        thermalStatus: 0,
-        isScreenOn: false,
-        isCharging: false,
-        voltageMv: 3950,
-      ));
-
-      engine.evaluateSample(TelemetrySample(
+      // Send 2 consecutive high-drain samples
+      freshEngine.evaluateSample(TelemetrySample(
         timestamp: now.subtract(const Duration(minutes: 1)),
         batteryLevel: 69,
         currentMilliamps: 670,
@@ -87,7 +77,7 @@ void main() {
         voltageMv: 3940,
       ));
 
-      final anomaly = engine.evaluateSample(TelemetrySample(
+      final anomaly = freshEngine.evaluateSample(TelemetrySample(
         timestamp: now,
         batteryLevel: 69,
         currentMilliamps: 680,

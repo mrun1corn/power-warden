@@ -54,6 +54,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _history.addAll(savedSamples);
     }
 
+    final savedAnomalies = await _database.getRecentAnomalies(limit: 20);
+    if (savedAnomalies.isNotEmpty) {
+      _incidents.addAll(savedAnomalies);
+    }
+
     _elevatedStatus = await _telemetryService.getElevatedStatus();
     _currentSample = await _telemetryService.getInstantMetrics();
     await _telemetryService.startForegroundService();
