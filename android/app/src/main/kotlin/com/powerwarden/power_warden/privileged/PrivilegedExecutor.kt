@@ -476,7 +476,8 @@ class PrivilegedExecutor(private val context: Context) {
                 return@withContext com.powerwarden.power_warden.service.WardenAccessibilityService.stopPackageAutomatically(packageName)
             }
 
-            // Priority 2: Direct user to Android's native App Info screen so they can tap Force Stop with 1 click
+            // Priority 2: Direct user to Android's native App Info screen so they can manually tap Force Stop
+            // Returns false so the UI knows the kill was NOT executed automatically!
             try {
                 withContext(Dispatchers.Main) {
                     val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -485,10 +486,8 @@ class PrivilegedExecutor(private val context: Context) {
                     }
                     context.startActivity(intent)
                 }
-                return@withContext true
-            } catch (_: Exception) {
-                return@withContext false
-            }
+            } catch (_: Exception) {}
+            return@withContext false
         }
 
         val res = executeCommand(cmd)

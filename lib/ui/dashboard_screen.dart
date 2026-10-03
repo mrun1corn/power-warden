@@ -358,163 +358,197 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final appEstimatedMa = math.max(2, (totalMa * (cpu / 100.0)).round());
 
                 return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isCriticalCpu
                         ? AppTheme.crimson.withOpacity(0.08)
-                        : (isHeavy ? AppTheme.amber.withOpacity(0.05) : Colors.transparent),
-                    borderRadius: BorderRadius.circular(12),
-                    border: isHeavy
-                        ? Border.all(
-                            color: isCriticalCpu
-                                ? AppTheme.crimson.withOpacity(0.4)
-                                : AppTheme.amber.withOpacity(0.3),
-                            width: 1,
-                          )
-                        : null,
-                  ),
-                  child: ListTile(
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isHeavy
-                            ? (isCriticalCpu
-                                ? AppTheme.crimson.withOpacity(0.2)
-                                : AppTheme.amber.withOpacity(0.2))
-                            : AppTheme.surfaceVariant,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isHeavy ? Icons.bolt_rounded : Icons.android_rounded,
-                        size: 16,
-                        color: isHeavy
-                            ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
-                            : AppTheme.textSecondary,
-                      ),
+                        : (isHeavy ? AppTheme.amber.withOpacity(0.05) : AppTheme.surfaceVariant.withOpacity(0.4)),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isHeavy
+                          ? (isCriticalCpu
+                              ? AppTheme.crimson.withOpacity(0.4)
+                              : AppTheme.amber.withOpacity(0.3))
+                          : AppTheme.surfaceBorder.withOpacity(0.5),
+                      width: 1,
                     ),
-                    title: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            name,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: isHeavy ? FontWeight.w800 : FontWeight.w600,
-                              fontSize: 13,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header Row: Icon, Full App Name, State Tag, and STOP button
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: isHeavy
+                                  ? (isCriticalCpu
+                                      ? AppTheme.crimson.withOpacity(0.2)
+                                      : AppTheme.amber.withOpacity(0.2))
+                                  : AppTheme.surfaceVariant,
+                              shape: BoxShape.circle,
                             ),
-                            overflow: TextOverflow.ellipsis,
+                            child: Icon(
+                              isHeavy ? Icons.bolt_rounded : Icons.android_rounded,
+                              size: 15,
+                              color: isHeavy
+                                  ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
+                                  : AppTheme.textSecondary,
+                            ),
                           ),
-                        ),
-                        if (ramMb > 0)
-                          Text(
-                            '${ramMb}MB',
-                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: isHeavy ? FontWeight.w800 : FontWeight.bold,
+                                    fontSize: 14,
+                                    height: 1.2,
+                                  ),
+                                  softWrap: true,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  pkg,
+                                  style: const TextStyle(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 10,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isHeavy
-                                ? (isCriticalCpu
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () async {
+                              final ok = await _telemetryService.remediateApp(pkg);
+                              if (mounted) {
+                                if (ok) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('✓ Force-stopped $name'),
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                  _loadProcesses();
+                                } else {
+                                  // If not automatically killed (i.e. opened App Info settings or unprivileged)
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Please tap "Force Stop" in $name system settings'),
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isHeavy
                                     ? AppTheme.crimson.withOpacity(0.2)
-                                    : AppTheme.amber.withOpacity(0.2))
-                                : AppTheme.accentGreen.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6),
+                                    : AppTheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isHeavy
+                                      ? AppTheme.crimson.withOpacity(0.4)
+                                      : AppTheme.surfaceBorder,
+                                ),
+                              ),
+                              child: Text(
+                                'STOP',
+                                style: TextStyle(
+                                  color: isHeavy ? AppTheme.crimson : AppTheme.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
                           ),
-                          child: Text(
-                            isCriticalCpu ? 'CRITICAL' : (isHeavy ? 'HEAVY' : 'CALM'),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Metrics Ribbon: Estimated mA, CPU %, RAM MB, and Status Chip
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceVariant,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.flash_on_rounded, size: 12, color: AppTheme.chargingCyan),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '~$appEstimatedMa mA',
+                                  style: const TextStyle(
+                                    color: AppTheme.chargingCyan,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${cpu.toStringAsFixed(1)}% CPU',
                             style: TextStyle(
                               color: isHeavy
                                   ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
-                                  : AppTheme.accentGreen,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                                  : AppTheme.textSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 2.0),
-                      child: Text(
-                        pkg,
-                        style: const TextStyle(color: AppTheme.textMuted, fontSize: 10),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '~$appEstimatedMa mA',
-                          style: TextStyle(
-                            color: isHeavy
-                                ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
-                                : AppTheme.chargingCyan,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${cpu.toStringAsFixed(1)}%',
-                          style: const TextStyle(
-                            color: AppTheme.textMuted,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        InkWell(
-                          onTap: () async {
-                            final hasElevatedShell = _elevatedStatus['hasKadb'] == true || _elevatedStatus['hasShizukuPermission'] == true;
-                            final isAccessibilityOn = await _telemetryService.isAccessibilityServiceActive();
-
-                            final ok = await _telemetryService.remediateApp(pkg);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(ok
-                                      ? (hasElevatedShell || isAccessibilityOn
-                                          ? '✓ Force-stopped $name'
-                                          : 'Tap "Force Stop" on $name system info')
-                                      : 'Could not open $name settings'),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                              _loadProcesses();
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          if (ramMb > 0) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '•   ${ramMb}MB RAM',
+                              style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                            ),
+                          ],
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: isHeavy
-                                  ? AppTheme.crimson.withOpacity(0.2)
-                                  : AppTheme.surfaceVariant,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: isHeavy
-                                    ? AppTheme.crimson.withOpacity(0.4)
-                                    : AppTheme.surfaceBorder,
-                              ),
+                                  ? (isCriticalCpu
+                                      ? AppTheme.crimson.withOpacity(0.2)
+                                      : AppTheme.amber.withOpacity(0.2))
+                                  : AppTheme.accentGreen.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              'STOP',
+                              isCriticalCpu ? 'CRITICAL' : (isHeavy ? 'HEAVY' : 'CALM'),
                               style: TextStyle(
-                                color: isHeavy ? AppTheme.crimson : AppTheme.textSecondary,
-                                fontSize: 10,
+                                color: isHeavy
+                                    ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
+                                    : AppTheme.accentGreen,
+                                fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.5,
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
                 );
               },
