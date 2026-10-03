@@ -139,6 +139,11 @@ class PrivilegedExecutor(private val context: Context) {
         }
     }
 
+    fun isKadbPaired(): Boolean {
+        val prefs = context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
+        return prefs.getBoolean("is_kadb_paired", false)
+    }
+
     fun hasPermanentAdbPermissions(): Boolean {
         val hasStats = context.checkSelfPermission("android.permission.BATTERY_STATS") == PackageManager.PERMISSION_GRANTED
         val hasDump = context.checkSelfPermission("android.permission.DUMP") == PackageManager.PERMISSION_GRANTED
@@ -146,7 +151,7 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     fun hasKadbConnected(): Boolean {
-        return activeKadb != null || hasPermanentAdbPermissions()
+        return activeKadb != null || isKadbPaired() || hasPermanentAdbPermissions()
     }
 
     /**
