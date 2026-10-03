@@ -97,48 +97,46 @@ class _SetupScreenState extends State<SetupScreen> {
                   0 => _buildWelcomeStep(),
                   1 => _buildTelemetryIntroStep(),
                   _ => _buildElevationStep(),
-                },
-              ),
+   },
+ ),
 
-              // Bottom Navigation Controls
-              Row(
-                children: [
-                  if (_currentStep > 0)
-                    OutlinedButton(
-                      onPressed: () => setState(() => _currentStep--),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: AppTheme.surfaceBorder),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                      ),
-                      child: const Text('Back'),
-                    ),
-                  const Spacer(),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_currentStep < 2) {
-                        setState(() => _currentStep++);
-                      } else {
-                        _finishSetup();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.accentGreen,
-                      foregroundColor: Colors.black,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                    ),
-                    child: Text(
-                      _currentStep == 2
-                          ? (_isPaired ? 'Get Started' : 'Start with Baseline')
-                          : 'Next',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
+ // Bottom Navigation Controls
+ Row(
+   children: [
+     if (_currentStep > 0)
+       OutlinedButton(
+         onPressed: () => setState(() => _currentStep--),
+         style: OutlinedButton.styleFrom(
+           foregroundColor: Colors.white,
+           side: const BorderSide(color: AppTheme.surfaceBorder),
+           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+         ),
+         child: const Text('Back'),
+       ),
+     const Spacer(),
+     ElevatedButton(
+       onPressed: () {
+         if (_currentStep < 2) {
+           setState(() => _currentStep++);
+         } else {
+           _finishSetup();
+         }
+       },
+       style: ElevatedButton.styleFrom(
+         backgroundColor: AppTheme.accentGreen,
+         foregroundColor: Colors.black,
+         elevation: 0,
+         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+       ),
+       child: Text(
+         _currentStep == 2 ? 'Get Started' : 'Next',
+         style: const TextStyle(fontWeight: FontWeight.bold),
+       ),
+     ),
+   ],
+ ),
             ],
           ),
         ),
@@ -301,7 +299,7 @@ class _SetupScreenState extends State<SetupScreen> {
           ),
         ),
         const Spacer(),
-        if (_isPaired) ...[
+        if (_isPaired)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -315,14 +313,14 @@ class _SetupScreenState extends State<SetupScreen> {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Ready! Deep Diagnostics and 1-tap app remediation are active.',
+                    'Setup is ready. You are all set!',
                     style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
             ),
-          ),
-        ] else ...[
+          )
+        else
           InkWell(
             onTap: _openPairing,
             borderRadius: BorderRadius.circular(16),
@@ -358,7 +356,6 @@ class _SetupScreenState extends State<SetupScreen> {
               ),
             ),
           ),
-        ],
         const SizedBox(height: 20),
       ],
     );
