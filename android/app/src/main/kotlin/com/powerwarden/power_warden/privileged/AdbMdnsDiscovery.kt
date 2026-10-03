@@ -3,19 +3,20 @@ package com.powerwarden.power_warden.privileged
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
 
 /**
  * Discovers Wireless Debugging pairing and connection ports on localhost / local network
  * using Android's native Network Service Discovery (mDNS).
- * Service types:
- * - "_adb-tls-pairing._tcp" -> Auto-discovers the dynamic pairing port!
- * - "_adb-tls-connect._tcp" -> Auto-discovers the active connection port!
+ * Acquires a MulticastLock to prevent Android OS from discarding mDNS broadcast packets.
  */
 class AdbMdnsDiscovery(private val context: Context) {
 
     private val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    private val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+    private var multicastLock: WifiManager.MulticastLock? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     var discoveredPairingPort: Int? = null
@@ -33,6 +34,17 @@ class AdbMdnsDiscovery(private val context: Context) {
     private val resolveQueue = mutableListOf<NsdServiceInfo>()
 
     fun startDiscovery() {
+        try {
+            if (multicastLock == null) {
+                multicastLock = wifiManager?.createMulticastLock("PowerWardenMdnsLock")?.apply {
+                    setReferenceCounted(true)
+                    acquire()
+                }
+            } else if (multicastLock?.isHeld == false) {
+                multicastLock?.acquire()
+            }
+        } catch (_: Exception) {}
+
         startPairingDiscovery()
         startConnectDiscovery()
     }
@@ -146,6 +158,12 @@ class AdbMdnsDiscovery(private val context: Context) {
     }
 
     fun stopDiscovery() {
+        try {
+            if (multicastLock?.isHeld == true) {
+                multicastLock?.release()
+            }
+        } catch (_: Exception) {}
+
         pairingDiscoveryListener?.let {
             try { nsdManager.stopServiceDiscovery(it) } catch (_: Exception) {}
             pairingDiscoveryListener = null

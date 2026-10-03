@@ -194,8 +194,11 @@ class PrivilegedExecutor(private val context: Context) {
         // Strategy 1: Elevated / Shell 'top' or 'ps' parsing
         try {
             var res = executeCommand("top -n 1 -m 25")
-            if (!res.isSuccess || res.stdout.isBlank() || res.stdout.contains("Unknown option")) {
+            if (!res.isSuccess || res.stdout.isBlank() || res.stdout.contains("Unknown option") || res.stdout.contains("invalid option")) {
                 res = executeCommand("top -b -n 1 -m 25")
+            }
+            if (!res.isSuccess || res.stdout.isBlank()) {
+                res = executeCommand("ps -ef -o PID,%CPU,RSS,NAME")
             }
             if (!res.isSuccess || res.stdout.isBlank()) {
                 res = executeCommand("ps -A -o PID,%CPU,RSS,NAME")

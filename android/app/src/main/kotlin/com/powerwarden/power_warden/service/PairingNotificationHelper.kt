@@ -10,6 +10,9 @@ import android.content.IntentFilter
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Posts an ongoing notification with a Direct Reply RemoteInput field.
@@ -48,6 +51,13 @@ class PairingNotificationHelper(private val context: Context) {
     }
 
     fun showPairingNotification(discoveredPort: Int?) {
+        if (discoveredPort != null && discoveredPort > 0) {
+            context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
+                .edit()
+                .putInt("last_pairing_port", discoveredPort)
+                .apply()
+        }
+
         val portText = if (discoveredPort != null) "Detected Port: $discoveredPort" else "Searching for port via mDNS..."
 
         val openSettingsIntent = Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS").apply {
@@ -65,8 +75,12 @@ class PairingNotificationHelper(private val context: Context) {
             .setLabel("6-digit code")
             .build()
 
-        val replyIntent = Intent(ACTION_CODE_SUBMITTED).apply {
+        val replyIntent = Intent(context, CodeReceiver::class.java).apply {
+            action = ACTION_CODE_SUBMITTED
             setPackage(context.packageName)
+            if (discoveredPort != null && discoveredPort > 0) {
+                putExtra("discovered_pairing_port", discoveredPort)
+            }
         }
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -112,8 +126,30 @@ class PairingNotificationHelper(private val context: Context) {
             if (intent?.action == ACTION_CODE_SUBMITTED) {
                 val remoteInput = RemoteInput.getResultsFromIntent(intent)
                 val code = remoteInput?.getCharSequence(KEY_PAIRING_CODE)?.toString()
-                if (!code.isNullOrBlank()) {
-                    onCodeReceivedListener?.invoke(code.trim())
+                if (!code.isNullOrBlank() && ctx != null) {
+                    val cleanCode = code.trim()
+                    val port = intent.getIntExtra("discovered_pairing_port", -1)
+
+                    // Execute pairing even if MainActivity was paused by Developer Options
+                    val pendingResult = goAsync()
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        try {
+                            val executor = com.powerwarden.power_warden.privileged.PrivilegedExecutor(ctx.applicationContext)
+                            val finalPort = if (port > 0) port else {
+                                ctx.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
+                                    .getInt("last_pairing_port", -1)
+                            }
+
+                            if (finalPort > 0) {
+                                executor.pairKadb(finalPort, cleanCode)
+                                val notifMgr = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                                notifMgr?.cancel(NOTIFICATION_ID)
+                            }
+                        } finally {
+                            pendingResult.finish()
+                        }
+                    }
+                    onCodeReceivedListener?.invoke(cleanCode)
                 }
             }
         }
