@@ -215,6 +215,13 @@ class MainActivity : FlutterActivity() {
                         result.success(procs)
                     }
                 }
+                "getHistoricalAppUsage" -> {
+                    val days = call.argument<Int>("days") ?: 1
+                    activityScope.launch {
+                        val history = privilegedExecutor.getHistoricalAppUsage(days)
+                        result.success(history)
+                    }
+                }
                 "runDeltaDiagnostics" -> {
                     activityScope.launch {
                         val diag = privilegedExecutor.runDifferentialDiagnostics()

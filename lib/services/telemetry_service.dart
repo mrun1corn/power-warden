@@ -165,6 +165,17 @@ class TelemetryService {
     return {};
   }
 
+  /// Retrieves aggregated historical app energy and time usage.
+  Future<List<Map<String, dynamic>>> getHistoricalAppUsage({int days = 1}) async {
+    try {
+      final res = await _methodChannel.invokeListMethod<dynamic>('getHistoricalAppUsage', {'days': days});
+      if (res != null) {
+        return res.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
   /// Remediates a rogue application via elevated ADB.
   Future<bool> remediateApp(String packageName, {String action = 'force_stop'}) async {
     try {
