@@ -8,6 +8,7 @@ class TelemetrySample {
   final bool isScreenOn; // True if display was active
   final bool isCharging; // True if plugged into AC/USB
   final int voltageMv; // e.g. 4120 mV
+  final int sleepDurationMs;
 
   const TelemetrySample({
     this.id,
@@ -19,6 +20,7 @@ class TelemetrySample {
     required this.isScreenOn,
     required this.isCharging,
     required this.voltageMv,
+    this.sleepDurationMs = 0,
   });
 
   TelemetrySample copyWith({
@@ -31,6 +33,7 @@ class TelemetrySample {
     bool? isScreenOn,
     bool? isCharging,
     int? voltageMv,
+    int? sleepDurationMs,
   }) {
     return TelemetrySample(
       id: id ?? this.id,
@@ -42,6 +45,7 @@ class TelemetrySample {
       isScreenOn: isScreenOn ?? this.isScreenOn,
       isCharging: isCharging ?? this.isCharging,
       voltageMv: voltageMv ?? this.voltageMv,
+      sleepDurationMs: sleepDurationMs ?? this.sleepDurationMs,
     );
   }
 
@@ -56,6 +60,7 @@ class TelemetrySample {
       'isScreenOn': isScreenOn,
       'isCharging': isCharging,
       'voltageMv': voltageMv,
+      'sleepDurationMs': sleepDurationMs,
     };
   }
 
@@ -78,6 +83,7 @@ class TelemetrySample {
     final screenOn = (map['isScreenOn'] ?? false) as bool;
     final charging = (map['isCharging'] ?? !(map['isDischarging'] ?? true)) as bool;
     final voltage = (map['voltageMv'] ?? map['voltage'] ?? 0) as int;
+    final sleepMs = (map['sleepDurationMs'] ?? 0) as int;
 
     return TelemetrySample(
       id: map['id'] as int?,
@@ -89,6 +95,7 @@ class TelemetrySample {
       isScreenOn: screenOn,
       isCharging: charging,
       voltageMv: voltage,
+      sleepDurationMs: sleepMs,
     );
   }
 }

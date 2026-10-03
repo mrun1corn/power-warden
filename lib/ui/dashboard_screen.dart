@@ -29,11 +29,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final List<AnomalyIncident> _incidents = [];
 
   StreamSubscription<TelemetrySample>? _streamSub;
-  Map<String, bool> _elevatedStatus = {'hasShizuku': false, 'hasPermission': false, 'hasKadb': false};
+  Map<String, bool> _elevatedStatus = {
+    'hasShizuku': false,
+    'hasPermission': false,
+    'hasKadb': true,
+    'hasPermanentAdb': true,
+    'hasAnyElevatedAccess': true, // Optimistically assumed true to prevent initial 1ms flash
+  };
 
   List<Map<String, dynamic>> _topProcesses = [];
   bool _isLoadingProcesses = false;
   Timer? _processRefreshTimer;
+
+  bool _dismissedNightStandby = false;
 
   @override
   void initState() {
@@ -266,6 +274,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 children: [
+                  // Feature 2: Sleep Sentinel Night Standby Card (Shown if phone woke up after resting)
+                  if (!_dismissedNightStandby && (sample.sleepDurationMs > (1000 * 60 * 30))) ...[
+                    _buildNightStandbyCard(sample),
+                    const SizedBox(height: 12),
+                  ],
+
                   // Battery Guru Hero Card
                   _buildBatteryGuruHeroCard(sample),
                   const SizedBox(height: 12),
@@ -284,6 +298,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildNightStandbyCard(TelemetrySample sample) {
+    final hoursAsleep = (sample.sleepDurationMs / (1000.0 * 60 * 60)).toStringAsFixed(1);
+    final idleBurnRate = ((sample.currentMilliamps.abs() / 4500.0) * 100.0).toStringAsFixed(1);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.chargingCyan.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.chargingCyan.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.nightlight_round, color: AppTheme.chargingCyan, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sleep Standby Summary',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Rested for ${hoursAsleep}h • Average burn: ~$idleBurnRate%/hr',
+                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 16, color: AppTheme.textMuted),
+            onPressed: () => setState(() => _dismissedNightStandby = true),
+          ),
+        ],
+      ),
     );
   }
 
@@ -564,6 +625,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final absMa = sample.currentMilliamps.abs();
     final hoursRemaining = isCharging ? 0.8 : (level * 0.22);
 
+    // Calculate real-time %/hr burn or charge rate (Standard 4500mAh battery reference)
+    final percentPerHour = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
+    final rateText = isCharging ? '+$percentPerHour%/hr' : '-$percentPerHour%/hr';
+
     final statusColor = isCharging
         ? AppTheme.chargingCyan
         : (absMa > 1200
@@ -608,6 +673,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             color: statusColor,
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            rateText,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -680,6 +761,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final absMa = sample.currentMilliamps.abs();
     final isCharging = sample.isCharging;
     final volts = (sample.voltageMv / 1000.0).toStringAsFixed(2);
+    final watts = ((sample.voltageMv / 1000.0) * (absMa / 1000.0)).toStringAsFixed(1);
 
     final currentLabel = isCharging ? '+$absMa mA' : '-$absMa mA';
     final currentColor = isCharging
@@ -699,8 +781,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _buildRibbonItem(
             icon: Icons.speed_rounded,
             color: currentColor,
-            label: 'CURRENT',
+            label: isCharging ? 'CHARGE' : 'CURRENT',
             value: currentLabel,
+          ),
+          Container(width: 1, height: 32, color: AppTheme.surfaceBorder),
+          _buildRibbonItem(
+            icon: Icons.bolt_rounded,
+            color: isCharging ? AppTheme.chargingCyan : AppTheme.amber,
+            label: 'POWER',
+            value: '${watts}W',
           ),
           Container(width: 1, height: 32, color: AppTheme.surfaceBorder),
           _buildRibbonItem(
@@ -711,9 +800,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           Container(width: 1, height: 32, color: AppTheme.surfaceBorder),
           _buildRibbonItem(
-            icon: Icons.electric_bolt_rounded,
-            color: AppTheme.amber,
-            label: 'VOLTAGE',
+            icon: Icons.battery_charging_full_rounded,
+            color: AppTheme.textSecondary,
+            label: 'VOLTS',
             value: '${volts}V',
           ),
         ],
