@@ -56,6 +56,9 @@ class _SetupScreenState extends State<SetupScreen> {
         hasKadb: _elevatedStatus['hasKadb'] ?? false,
         onAuthorized: () async {
           await _checkStatus();
+          if (mounted) {
+            Navigator.pop(context);
+          }
         },
       ),
     );

@@ -102,14 +102,16 @@ class AnomalyCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Plain diagnosis headline
+            // Compact single-line diagnosis headline
             Text(
               incident.diagnosis,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
-                height: 1.35,
+                height: 1.3,
               ),
             ),
 

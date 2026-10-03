@@ -59,13 +59,15 @@ class DrainTimelineChart extends StatelessWidget {
                     color: AppTheme.textSecondary,
                   ),
                 ),
-                Row(
-                  children: [
-                    _buildLegendItem('mA Drain', AppTheme.crimson),
-                    const SizedBox(width: 12),
-                    _buildLegendItem('Charging', AppTheme.chargingCyan),
-                  ],
-                ),
+                  // Legend with Clear Labels
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppTheme.chargingCyan, shape: BoxShape.circle)),
+                      const SizedBox(width: 4),
+                      const Text('Discharge / Charge Rate (mA)', style: TextStyle(color: AppTheme.textMuted, fontSize: 10)),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -77,8 +79,9 @@ class DrainTimelineChart extends StatelessWidget {
                   show: true,
                   drawVerticalLine: false,
                   getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppTheme.surfaceBorder.withOpacity(0.5),
+                    color: AppTheme.surfaceBorder.withOpacity(0.4),
                     strokeWidth: 1,
+                    dashArray: [4, 4],
                   ),
                 ),
                 titlesData: FlTitlesData(
@@ -88,11 +91,11 @@ class DrainTimelineChart extends StatelessWidget {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 42,
+                      reservedSize: 48,
                       getTitlesWidget: (val, meta) {
                         return Text(
-                          '${val.toInt()}m',
-                          style: const TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                          '${val.toInt()} mA',
+                          style: const TextStyle(color: AppTheme.textMuted, fontSize: 9, fontWeight: FontWeight.w600),
                         );
                       },
                     ),
@@ -103,16 +106,9 @@ class DrainTimelineChart extends StatelessWidget {
                   LineChartBarData(
                     spots: currentSpots,
                     isCurved: true,
-                    curveSmoothness: 0.25,
-                    gradient: const LinearGradient(
-                      colors: [
-                        AppTheme.chargingCyan,
-                        AppTheme.accentGreen,
-                        AppTheme.amber,
-                      ],
-                      stops: [0.0, 0.6, 1.0],
-                    ),
-                    barWidth: 2.2,
+                    curveSmoothness: 0.2,
+                    color: AppTheme.chargingCyan,
+                    barWidth: 2.0,
                     isStrokeCapRound: true,
                     dotData: const FlDotData(show: false),
                     belowBarData: BarAreaData(
@@ -121,8 +117,8 @@ class DrainTimelineChart extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppTheme.chargingCyan.withOpacity(0.16),
-                          Colors.transparent,
+                          AppTheme.chargingCyan.withOpacity(0.18),
+                          AppTheme.chargingCyan.withOpacity(0.0),
                         ],
                       ),
                     ),
@@ -133,16 +129,6 @@ class DrainTimelineChart extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildLegendItem(String label, Color color) {
-    return Row(
-      children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: AppTheme.textMuted, fontSize: 10)),
-      ],
     );
   }
 }

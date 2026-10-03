@@ -202,7 +202,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         hasKadb: _elevatedStatus['hasKadb'] ?? false,
         onAuthorized: () async {
           final s = await _telemetryService.getElevatedStatus();
-          setState(() => _elevatedStatus = s);
+          if (mounted) {
+            setState(() => _elevatedStatus = s);
+            Navigator.pop(context); // Close sheet automatically upon success!
+          }
         },
       ),
     );
@@ -662,9 +665,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        (_elevatedStatus['hasKadb'] == true)
-                            ? 'KADB'
-                            : ((_elevatedStatus['hasShizukuPermission'] == true) ? 'SHIZUKU' : 'UNPAIRED'),
+                        (_elevatedStatus['hasPermanentAdb'] == true)
+                            ? 'ADB GRANTED'
+                            : ((_elevatedStatus['hasKadb'] == true)
+                                ? 'KADB'
+                                : ((_elevatedStatus['hasShizukuPermission'] == true) ? 'SHIZUKU' : 'UNPAIRED')),
                         style: TextStyle(
                           color: (_elevatedStatus['hasAnyElevatedAccess'] == true)
                               ? AppTheme.accentGreen

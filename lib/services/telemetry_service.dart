@@ -61,6 +61,7 @@ class TelemetryService {
           'hasShizukuPermission': (res['hasShizukuPermission'] as bool?) ?? false,
           'hasPermission': (res['hasPermission'] as bool?) ?? false,
           'hasKadb': (res['hasKadb'] as bool?) ?? false,
+          'hasPermanentAdb': (res['hasPermanentAdb'] as bool?) ?? false,
           'hasAnyElevatedAccess': (res['hasAnyElevatedAccess'] as bool?) ?? false,
         };
       }
@@ -70,6 +71,7 @@ class TelemetryService {
       'hasShizukuPermission': false,
       'hasPermission': false,
       'hasKadb': false,
+      'hasPermanentAdb': false,
       'hasAnyElevatedAccess': false,
     };
   }

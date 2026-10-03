@@ -69,7 +69,7 @@ void main() {
       freshEngine.evaluateSample(TelemetrySample(
         timestamp: now.subtract(const Duration(minutes: 1)),
         batteryLevel: 69,
-        currentMilliamps: 670,
+        currentMilliamps: 720,
         temperatureCelsius: 35.2,
         thermalStatus: 0,
         isScreenOn: false,
@@ -80,7 +80,7 @@ void main() {
       final anomaly = freshEngine.evaluateSample(TelemetrySample(
         timestamp: now,
         batteryLevel: 69,
-        currentMilliamps: 680,
+        currentMilliamps: 740,
         temperatureCelsius: 35.4,
         thermalStatus: 0,
         isScreenOn: false,
@@ -90,7 +90,7 @@ void main() {
 
       expect(anomaly, isNotNull);
       expect(anomaly!.severity, AnomalySeverity.moderate);
-      expect(anomaly.peakCurrentMa, 680);
+      expect(anomaly.peakCurrentMa, 740);
     });
   });
 }

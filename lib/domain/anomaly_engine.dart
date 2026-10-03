@@ -62,29 +62,20 @@ class AnomalyEngine {
     // --- Heuristic 2: Active or Screen-Off Runaway Drain (>450mA sustained) ---
     if (_recentSamples.length >= _consecutiveSpikeThreshold) {
       final window = _recentSamples.sublist(_recentSamples.length - _consecutiveSpikeThreshold);
-      final allSpiking = window.every((s) => s.currentMilliamps >= 450);
+      final allSpiking = window.every((s) => s.currentMilliamps >= 500);
 
       if (allSpiking) {
         final peakMa = window.map((s) => s.currentMilliamps).reduce(max);
         final maxTemp = window.map((s) => s.temperatureCelsius).reduce(max);
 
-        if (peakMa >= 650) {
+        if (peakMa >= 700) {
           return AnomalyIncident(
             startTime: window.first.timestamp,
             severity: AnomalySeverity.moderate,
             peakCurrentMa: peakMa,
             maxTemperatureCelsius: maxTemp,
-            diagnosis: 'High discharge rate sustained (${peakMa}mA). A background service or wakelock is burning battery.',
+            diagnosis: 'High discharge rate sustained ($peakMa mA). A background service or wakelock is burning battery.',
             recommendedAction: 'Check active app energy list',
-          );
-        } else {
-          return AnomalyIncident(
-            startTime: window.first.timestamp,
-            severity: AnomalySeverity.mild,
-            peakCurrentMa: peakMa,
-            maxTemperatureCelsius: maxTemp,
-            diagnosis: 'Elevated power drain (${peakMa}mA vs baseline ${_baselineIdleMa.round()}mA). App activity detected.',
-            recommendedAction: 'Monitor background sync',
           );
         }
       }
