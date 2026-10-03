@@ -35,9 +35,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, bool> _elevatedStatus = {
     'hasShizuku': false,
     'hasPermission': false,
-    'hasKadb': true,
-    'hasPermanentAdb': true,
-    'hasAnyElevatedAccess': true, // Optimistically assumed true to prevent initial 1ms flash
+    'hasKadb': false,
+    'hasPermanentAdb': false,
+    'hasAnyElevatedAccess': false,
   };
 
   List<Map<String, dynamic>> _topProcesses = [];

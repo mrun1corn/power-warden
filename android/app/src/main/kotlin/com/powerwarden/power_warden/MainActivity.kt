@@ -40,10 +40,8 @@ class MainActivity : FlutterActivity() {
         pairingNotificationHelper = com.powerwarden.power_warden.service.PairingNotificationHelper(this)
 
         mdnsDiscovery.onPairingPortDiscovered = { port ->
-            // Only post pairing helper notification if app does NOT have elevated permissions yet
-            if (!privilegedExecutor.hasKadbConnected() && !privilegedExecutor.hasShizukuPermission()) {
-                pairingNotificationHelper.showPairingNotification(port)
-            }
+            // Always post pairing notification when an active pairing service is broadcasting on the network
+            pairingNotificationHelper.showPairingNotification(port)
         }
 
         // Auto-start discovery and attempt auto-reconnect on launch

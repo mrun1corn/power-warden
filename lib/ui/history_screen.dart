@@ -63,18 +63,25 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     final textMuted = isDark ? AppTheme.textMuted : AppTheme.textMutedLight;
 
     return Scaffold(
+      backgroundColor: isDark ? AppTheme.pureOledBackground : AppTheme.lightBackground,
       appBar: AppBar(
-        title: const Text('Power History'),
+        backgroundColor: isDark ? AppTheme.pureOledBackground : AppTheme.lightBackground,
+        title: Text(
+          'Power History',
+          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+        ),
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
+          isScrollable: false, // Clean equal distribution across screen width (no cutoffs)
           labelColor: AppTheme.accentGreen,
           unselectedLabelColor: textMuted,
           indicatorColor: AppTheme.accentGreen,
+          indicatorWeight: 3,
+          labelPadding: EdgeInsets.zero,
           tabs: const [
-            Tab(icon: Icon(Icons.flash_on_rounded, size: 18), text: 'Charging'),
-            Tab(icon: Icon(Icons.battery_alert_rounded, size: 18), text: 'Discharging'),
-            Tab(icon: Icon(Icons.apps_rounded, size: 18), text: 'App Usage'),
+            Tab(icon: Icon(Icons.flash_on_rounded, size: 18), text: 'Charge'),
+            Tab(icon: Icon(Icons.battery_alert_rounded, size: 18), text: 'Drain'),
+            Tab(icon: Icon(Icons.apps_rounded, size: 18), text: 'Apps'),
             Tab(icon: Icon(Icons.nightlight_round, size: 18), text: 'Standby'),
           ],
         ),
@@ -133,29 +140,14 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     required bool isChargingTab,
   }) {
     if (sessions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isChargingTab ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
-              size: 48,
-              color: textMuted,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              isChargingTab ? 'No charging sessions recorded yet' : 'No discharge cycles recorded yet',
-              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              isChargingTab
-                  ? 'Connect your phone to power to log charging speed and health'
-                  : 'Use your device on battery power to log discharge cycles',
-              style: TextStyle(color: textMuted, fontSize: 12),
-            ),
-          ],
-        ),
+      return _buildEmptyState(
+        icon: isChargingTab ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
+        title: isChargingTab ? 'No charging sessions recorded yet' : 'No discharge cycles recorded yet',
+        subtitle: isChargingTab
+            ? 'Connect your phone to power to log charging speed, power (W), and battery health.'
+            : 'Use your device on battery power to log discharge cycles and drain rates.',
+        textColor: textColor,
+        textMuted: textMuted,
       );
     }
 
@@ -267,23 +259,12 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     bool isDark,
   ) {
     if (_appUsageList.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.apps_rounded, size: 48, color: textMuted),
-            const SizedBox(height: 12),
-            Text(
-              'No app usage history found',
-              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Ensure Usage Access permission is granted to see app burn breakdown',
-              style: TextStyle(color: textMuted, fontSize: 12),
-            ),
-          ],
-        ),
+      return _buildEmptyState(
+        icon: Icons.apps_rounded,
+        title: 'No app usage history found',
+        subtitle: 'Ensure Usage Access permission is granted to see app burn breakdown.',
+        textColor: textColor,
+        textMuted: textMuted,
       );
     }
 
@@ -375,24 +356,12 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     final sleepSamples = _historicalSamples.where((s) => s.sleepDurationMs > (1000 * 60 * 30)).toList();
 
     if (sleepSamples.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.nightlight_round, size: 48, color: textMuted),
-            const SizedBox(height: 12),
-            Text(
-              'No sleep standby intervals detected yet',
-              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'PowerWarden automatically tracks standby sessions when your phone rests overnight',
-              style: TextStyle(color: textMuted, fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+      return _buildEmptyState(
+        icon: Icons.nightlight_round,
+        title: 'No sleep standby intervals detected yet',
+        subtitle: 'PowerWarden automatically tracks standby sessions when your phone rests overnight or sleeps for >30 minutes.',
+        textColor: textColor,
+        textMuted: textMuted,
       );
     }
 
@@ -473,6 +442,43 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color textColor,
+    required Color textMuted,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: textMuted.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 44, color: textMuted),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: TextStyle(color: textMuted, fontSize: 13, height: 1.4),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 

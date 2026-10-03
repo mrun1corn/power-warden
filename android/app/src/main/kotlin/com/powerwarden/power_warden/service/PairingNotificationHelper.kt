@@ -70,48 +70,17 @@ class PairingNotificationHelper(private val context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         )
 
-        // Compact RemoteInput label so input text is never pushed off-screen
-        val remoteInput = RemoteInput.Builder(KEY_PAIRING_CODE)
-            .setLabel("6-digit code")
-            .build()
-
-        val replyIntent = Intent(context, CodeReceiver::class.java).apply {
-            action = ACTION_CODE_SUBMITTED
-            setPackage(context.packageName)
-            if (discoveredPort != null && discoveredPort > 0) {
-                putExtra("discovered_pairing_port", discoveredPort)
-            }
-        }
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
-        val replyPendingIntent = PendingIntent.getBroadcast(
-            context,
-            1002,
-            replyIntent,
-            flags
-        )
-
-        val replyAction = NotificationCompat.Action.Builder(
-            android.R.drawable.ic_input_add,
-            "Enter Code",
-            replyPendingIntent
-        )
-            .addRemoteInput(remoteInput)
-            .build()
-
         val portShort = if (discoveredPort != null) "Port: $discoveredPort" else "Waiting for port..."
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("Wireless ADB Pairing Helper")
-            .setContentText("$portShort · Tap 'Enter Code' below")
+            .setContentText("$portShort · Tap to enter pairing code")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setOngoing(true)
-            .addAction(replyAction)
-            .addAction(android.R.drawable.ic_menu_preferences, "Settings", openSettingsPending)
+            .setContentIntent(openSettingsPending)
+            .addAction(android.R.drawable.ic_menu_preferences, "Open Settings", openSettingsPending)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
