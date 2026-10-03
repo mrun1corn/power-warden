@@ -3,10 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../domain/anomaly_engine.dart';
 import '../domain/models/anomaly_incident.dart';
+import '../domain/models/power_session.dart';
 import '../domain/models/telemetry_sample.dart';
 import '../data/database/database.dart';
+import '../main.dart';
 import '../services/notification_service.dart';
 import '../services/telemetry_service.dart';
+import 'history_screen.dart';
 import 'theme.dart';
 import 'widgets/drain_timeline_chart.dart';
 import 'widgets/wireless_pairing_sheet.dart';
@@ -42,6 +45,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _processRefreshTimer;
 
   bool _dismissedNightStandby = false;
+
+  // Session History Tracking
+  DateTime? _sessionStartTime;
+  int? _sessionStartLevel;
+  bool? _sessionIsCharging;
+  int _peakMaInSession = 0;
+  double _peakWattsInSession = 0.0;
+  double _minTempInSession = 99.0;
+  double _maxTempInSession = 0.0;
 
   @override
   void initState() {
@@ -84,6 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Listen to live stream
     _streamSub = _telemetryService.telemetryStream.listen((sample) {
+      _processSessionTracking(sample);
       setState(() {
         _currentSample = sample;
         _history.add(sample);
@@ -114,6 +127,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) {
       setState(() {});
       _checkElevatedWarning();
+    }
+  }
+
+  void _processSessionTracking(TelemetrySample sample) {
+    final now = DateTime.now();
+    final absMa = sample.currentMilliamps.abs();
+    final watts = (sample.voltageMv / 1000.0) * (absMa / 1000.0);
+
+    if (_sessionIsCharging == null) {
+      _sessionIsCharging = sample.isCharging;
+      _sessionStartTime = now;
+      _sessionStartLevel = sample.batteryLevel;
+      _peakMaInSession = absMa;
+      _peakWattsInSession = watts;
+      _minTempInSession = sample.temperatureCelsius;
+      _maxTempInSession = sample.temperatureCelsius;
+      return;
+    }
+
+    // Check if charging state changed (e.g. plugged in or unplugged)
+    if (_sessionIsCharging != sample.isCharging) {
+      final startTime = _sessionStartTime ?? now.subtract(const Duration(minutes: 5));
+      final duration = now.difference(startTime);
+
+      // Only save sessions longer than 1 minute to prevent instant plug/unplug clutter
+      if (duration.inMinutes >= 1) {
+        final startLvl = _sessionStartLevel ?? sample.batteryLevel;
+        final deltaPercent = (sample.batteryLevel - startLvl).abs();
+        final mahDelta = ((deltaPercent / 100.0) * 4500).round();
+        final topApp = _topProcesses.isNotEmpty ? (_topProcesses.first['name'] as String? ?? '') : '';
+
+        final session = PowerSession(
+          id: now.millisecondsSinceEpoch.toString(),
+          type: _sessionIsCharging! ? 'charging' : 'discharging',
+          startTime: startTime,
+          endTime: now,
+          startBatteryLevel: startLvl,
+          endBatteryLevel: sample.batteryLevel,
+          totalMahDelta: mahDelta,
+          peakMa: _peakMaInSession,
+          peakWatts: _peakWattsInSession,
+          minTempCelsius: _minTempInSession,
+          maxTempCelsius: _maxTempInSession,
+          topAppName: topApp,
+        );
+
+        _database.recordPowerSession(session);
+      }
+
+      // Reset for new session
+      _sessionIsCharging = sample.isCharging;
+      _sessionStartTime = now;
+      _sessionStartLevel = sample.batteryLevel;
+      _peakMaInSession = absMa;
+      _peakWattsInSession = watts;
+      _minTempInSession = sample.temperatureCelsius;
+      _maxTempInSession = sample.temperatureCelsius;
+    } else {
+      // Accumulate peak stats
+      if (absMa > _peakMaInSession) _peakMaInSession = absMa;
+      if (watts > _peakWattsInSession) _peakWattsInSession = watts;
+      if (sample.temperatureCelsius < _minTempInSession) _minTempInSession = sample.temperatureCelsius;
+      if (sample.temperatureCelsius > _maxTempInSession) _maxTempInSession = sample.temperatureCelsius;
     }
   }
 
@@ -250,6 +326,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
+          // Theme Toggle Button (Pure OLED Black vs Clean Light Mode)
+          IconButton(
+            icon: Icon(
+              Theme.of(context).brightness == Brightness.dark
+                  ? Icons.light_mode_outlined
+                  : Icons.dark_mode_outlined,
+              size: 20,
+            ),
+            tooltip: 'Toggle Theme',
+            onPressed: () async {
+              final isCurrentlyDark = Theme.of(context).brightness == Brightness.dark;
+              final newMode = isCurrentlyDark ? ThemeMode.light : ThemeMode.dark;
+              PowerWardenApp.themeModeNotifier.value = newMode;
+              await _telemetryService.setPrefBool('is_light_mode', isCurrentlyDark);
+            },
+          ),
+
+          // Power History Screen Button
+          IconButton(
+            icon: const Icon(Icons.history_rounded, size: 22),
+            tooltip: 'Power History',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HistoryScreen()),
+              );
+            },
+          ),
+
           // Only show settings/pairing icon if elevated access is NOT granted yet
           if (_elevatedStatus['hasAnyElevatedAccess'] != true)
             IconButton(
@@ -418,45 +523,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final totalMa = (_currentSample?.currentMilliamps.abs() ?? 450);
                 final appEstimatedMa = math.max(2, (totalMa * (cpu / 100.0)).round());
 
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                final cardBg = isDark
+                    ? (isCriticalCpu
+                        ? AppTheme.crimson.withValues(alpha: 0.08)
+                        : (isHeavy ? AppTheme.amber.withValues(alpha: 0.05) : AppTheme.surfaceVariantDark.withValues(alpha: 0.5)))
+                    : (isCriticalCpu
+                        ? AppTheme.crimson.withValues(alpha: 0.08)
+                        : (isHeavy ? AppTheme.amber.withValues(alpha: 0.06) : AppTheme.surfaceLight));
+
+                final cardBorder = isDark
+                    ? (isHeavy
+                        ? (isCriticalCpu
+                            ? AppTheme.crimson.withValues(alpha: 0.4)
+                            : AppTheme.amber.withValues(alpha: 0.3))
+                        : AppTheme.surfaceBorderDark.withValues(alpha: 0.6))
+                    : (isHeavy
+                        ? (isCriticalCpu
+                            ? AppTheme.crimson.withValues(alpha: 0.4)
+                            : AppTheme.amber.withValues(alpha: 0.4))
+                        : AppTheme.surfaceBorderLight);
+
+                final titleColor = isDark ? Colors.white : AppTheme.textPrimaryLight;
+                final subtitleColor = isDark ? AppTheme.textMuted : AppTheme.textMutedLight;
+
+                final stateColor = isHeavy
+                    ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
+                    : AppTheme.accentGreen;
+                final stateLabel = isCriticalCpu ? 'CRITICAL' : (isHeavy ? 'HEAVY' : 'CALM');
+
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isCriticalCpu
-                        ? AppTheme.crimson.withOpacity(0.08)
-                        : (isHeavy ? AppTheme.amber.withOpacity(0.05) : AppTheme.surfaceVariant.withOpacity(0.4)),
+                    color: cardBg,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isHeavy
-                          ? (isCriticalCpu
-                              ? AppTheme.crimson.withOpacity(0.4)
-                              : AppTheme.amber.withOpacity(0.3))
-                          : AppTheme.surfaceBorder.withOpacity(0.5),
-                      width: 1,
-                    ),
+                    border: Border.all(color: cardBorder, width: 1),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header Row: Icon, Full App Name, State Tag, and STOP button
+                      // Header Row: App Icon + Name + Symmetrical Action Group ([STATUS] [STOP])
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Container(
                             padding: const EdgeInsets.all(7),
                             decoration: BoxDecoration(
                               color: isHeavy
-                                  ? (isCriticalCpu
-                                      ? AppTheme.crimson.withOpacity(0.2)
-                                      : AppTheme.amber.withOpacity(0.2))
-                                  : AppTheme.surfaceVariant,
+                                  ? stateColor.withValues(alpha: 0.15)
+                                  : (isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               isHeavy ? Icons.bolt_rounded : Icons.android_rounded,
                               size: 15,
-                              color: isHeavy
-                                  ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
-                                  : AppTheme.textSecondary,
+                              color: isHeavy ? stateColor : (isDark ? AppTheme.textSecondary : AppTheme.textSecondaryLight),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -467,9 +589,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 Text(
                                   name,
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: titleColor,
                                     fontWeight: isHeavy ? FontWeight.w800 : FontWeight.bold,
-                                    fontSize: 14,
+                                    fontSize: 13,
                                     height: 1.2,
                                   ),
                                   softWrap: true,
@@ -477,8 +599,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 const SizedBox(height: 2),
                                 Text(
                                   pkg,
-                                  style: const TextStyle(
-                                    color: AppTheme.textMuted,
+                                  style: TextStyle(
+                                    color: subtitleColor,
                                     fontSize: 10,
                                     fontFamily: 'monospace',
                                   ),
@@ -489,65 +611,100 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          InkWell(
-                            onTap: () async {
-                              final ok = await _telemetryService.remediateApp(pkg);
-                              if (mounted) {
-                                if (ok) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('✓ Force-stopped $name'),
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                  _loadProcesses();
-                                } else {
-                                  // If not automatically killed (i.e. opened App Info settings or unprivileged)
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Please tap "Force Stop" in $name system settings'),
-                                      duration: const Duration(seconds: 3),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: isHeavy
-                                    ? AppTheme.crimson.withOpacity(0.2)
-                                    : AppTheme.surfaceVariant,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isHeavy
-                                      ? AppTheme.crimson.withOpacity(0.4)
-                                      : AppTheme.surfaceBorder,
+
+                          // Symmetrical Button Cluster: [STATUS] & [STOP] with identical height and border radius
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // State Indicator Button
+                              Container(
+                                height: 26,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: stateColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: stateColor.withValues(alpha: 0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  stateLabel,
+                                  style: TextStyle(
+                                    color: stateColor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.4,
+                                  ),
                                 ),
                               ),
-                              child: Text(
-                                'STOP',
-                                style: TextStyle(
-                                  color: isHeavy ? AppTheme.crimson : AppTheme.textSecondary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
+                              const SizedBox(width: 6),
+
+                              // Force Stop Action Button
+                              InkWell(
+                                onTap: () async {
+                                  final ok = await _telemetryService.remediateApp(pkg);
+                                  if (mounted) {
+                                    if (ok) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('✓ Force-stopped $name'),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                      _loadProcesses();
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Please tap "Force Stop" in $name system settings'),
+                                          duration: const Duration(seconds: 3),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  height: 26,
+                                  padding: const EdgeInsets.symmetric(horizontal: 9),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: isHeavy
+                                        ? AppTheme.crimson.withValues(alpha: 0.15)
+                                        : (isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: isHeavy
+                                          ? AppTheme.crimson.withValues(alpha: 0.4)
+                                          : (isDark ? AppTheme.surfaceBorderDark : AppTheme.surfaceBorderLight),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'STOP',
+                                    style: TextStyle(
+                                      color: isHeavy ? AppTheme.crimson : (isDark ? AppTheme.textSecondary : AppTheme.textSecondaryLight),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
 
-                      // Metrics Ribbon: Estimated mA, CPU %, RAM MB, and Status Chip
+                      // Metrics Ribbon: Estimated mA, CPU %, and RAM MB
                       Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppTheme.surfaceVariant,
+                              color: isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
@@ -570,9 +727,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Text(
                             '${cpu.toStringAsFixed(1)}% CPU',
                             style: TextStyle(
-                              color: isHeavy
-                                  ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
-                                  : AppTheme.textSecondary,
+                              color: isHeavy ? stateColor : (isDark ? AppTheme.textSecondary : AppTheme.textSecondaryLight),
                               fontWeight: FontWeight.w600,
                               fontSize: 11,
                             ),
@@ -581,32 +736,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(width: 8),
                             Text(
                               '•   ${ramMb}MB RAM',
-                              style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                            ),
-                          ],
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isHeavy
-                                  ? (isCriticalCpu
-                                      ? AppTheme.crimson.withOpacity(0.2)
-                                      : AppTheme.amber.withOpacity(0.2))
-                                  : AppTheme.accentGreen.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              isCriticalCpu ? 'CRITICAL' : (isHeavy ? 'HEAVY' : 'CALM'),
                               style: TextStyle(
-                                color: isHeavy
-                                    ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
-                                    : AppTheme.accentGreen,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
+                                color: subtitleColor,
+                                fontSize: 11,
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ],

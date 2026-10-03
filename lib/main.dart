@@ -21,6 +21,8 @@ void main() {
 class PowerWardenApp extends StatefulWidget {
   const PowerWardenApp({super.key});
 
+  static final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
+
   @override
   State<PowerWardenApp> createState() => _PowerWardenAppState();
 }
@@ -38,6 +40,9 @@ class _PowerWardenAppState extends State<PowerWardenApp> {
 
   Future<void> _checkSetup() async {
     final completed = await _telemetryService.getPrefBool('has_completed_setup', defaultValue: false);
+    final isLight = await _telemetryService.getPrefBool('is_light_mode', defaultValue: false);
+    PowerWardenApp.themeModeNotifier.value = isLight ? ThemeMode.light : ThemeMode.dark;
+
     if (mounted) {
       setState(() {
         _hasCompletedSetup = completed;
@@ -48,22 +53,29 @@ class _PowerWardenAppState extends State<PowerWardenApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'PowerWarden',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.theme,
-      home: _isLoading
-          ? const Scaffold(
-              backgroundColor: Colors.black,
-              body: Center(child: CircularProgressIndicator(color: AppTheme.accentGreen)),
-            )
-          : _hasCompletedSetup
-              ? const DashboardScreen()
-              : SetupScreen(
-                  onSetupComplete: () {
-                    setState(() => _hasCompletedSetup = true);
-                  },
-                ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: PowerWardenApp.themeModeNotifier,
+      builder: (context, currentMode, _) {
+        return MaterialApp(
+          title: 'PowerWarden',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentMode,
+          home: _isLoading
+              ? const Scaffold(
+                  backgroundColor: Colors.black,
+                  body: Center(child: CircularProgressIndicator(color: AppTheme.accentGreen)),
+                )
+              : _hasCompletedSetup
+                  ? const DashboardScreen()
+                  : SetupScreen(
+                      onSetupComplete: () {
+                        setState(() => _hasCompletedSetup = true);
+                      },
+                    ),
+        );
+      },
     );
   }
 }

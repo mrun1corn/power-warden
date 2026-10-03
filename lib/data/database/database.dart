@@ -6,10 +6,11 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/models/anomaly_incident.dart';
+import '../../domain/models/power_session.dart';
 import '../../domain/models/telemetry_sample.dart';
 
 /// Lightweight, zero-code-gen Local Persistence Engine.
-/// Stores telemetry samples and anomaly incidents with in-memory ring-buffer batching (every 15 min),
+/// Stores telemetry samples, anomaly incidents, and power sessions with in-memory ring-buffer batching (every 15 min),
 /// preventing continuous flash I/O wakes and pruning records older than 48 hours.
 class AppDatabase {
   static final AppDatabase _instance = AppDatabase._internal();
@@ -18,6 +19,7 @@ class AppDatabase {
 
   File? _telemetryFile;
   File? _anomaliesFile;
+  File? _sessionsFile;
 
   final List<TelemetrySample> _memoryBuffer = [];
   Timer? _flushTimer;
@@ -36,6 +38,7 @@ class AppDatabase {
 
     _telemetryFile = File(p.join(dbDir.path, 'telemetry_samples.jsonl'));
     _anomaliesFile = File(p.join(dbDir.path, 'anomaly_incidents.jsonl'));
+    _sessionsFile = File(p.join(dbDir.path, 'power_sessions.jsonl'));
 
     startPeriodicTasks();
   }
@@ -103,6 +106,37 @@ class AppDatabase {
           try {
             final map = jsonDecode(line) as Map<String, dynamic>;
             results.add(AnomalyIncident.fromMap(map));
+            if (results.length >= limit) break;
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+    return results;
+  }
+
+  /// Saves a charging or discharging session to history.
+  Future<void> recordPowerSession(PowerSession session) async {
+    if (_sessionsFile == null) return;
+    try {
+      await _sessionsFile!.writeAsString(
+        '${jsonEncode(session.toMap())}\n',
+        mode: FileMode.append,
+        flush: true,
+      );
+    } catch (_) {}
+  }
+
+  /// Retrieves recorded historical power sessions.
+  Future<List<PowerSession>> getRecentSessions({int limit = 40}) async {
+    final results = <PowerSession>[];
+    if (_sessionsFile != null && await _sessionsFile!.exists()) {
+      try {
+        final lines = await _sessionsFile!.readAsLines();
+        for (final line in lines.reversed) {
+          if (line.trim().isEmpty) continue;
+          try {
+            final map = jsonDecode(line) as Map<String, dynamic>;
+            results.add(PowerSession.fromMap(map));
             if (results.length >= limit) break;
           } catch (_) {}
         }

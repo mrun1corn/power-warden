@@ -1,14 +1,25 @@
 import 'package:flutter/material.dart';
 
-/// Pure OLED Dark Theme palette for PowerWarden.
+/// Dynamic Theme Palette for PowerWarden: Pure OLED Black & Crisp Clean Light Mode.
 class AppTheme {
   AppTheme._();
 
-  // Colors
+  // OLED Dark Palette
   static const Color pureOledBackground = Color(0xFF000000);
-  static const Color surface = Color(0xFF121212);
-  static const Color surfaceVariant = Color(0xFF1E1E1E);
-  static const Color surfaceBorder = Color(0xFF2C2C2C);
+  static const Color surfaceDark = Color(0xFF121212);
+  static const Color surfaceVariantDark = Color(0xFF1E1E1E);
+  static const Color surfaceBorderDark = Color(0xFF2C2C2C);
+
+  // Clean Light Palette
+  static const Color lightBackground = Color(0xFFF8F9FA);
+  static const Color surfaceLight = Color(0xFFFFFFFF);
+  static const Color surfaceVariantLight = Color(0xFFF1F3F5);
+  static const Color surfaceBorderLight = Color(0xFFE9ECEF);
+
+  // Backwards compatibility aliases for dark theme default
+  static const Color surface = surfaceDark;
+  static const Color surfaceVariant = surfaceVariantDark;
+  static const Color surfaceBorder = surfaceBorderDark;
 
   // Status & Accents
   static const Color accentGreen = Color(0xFF00E676); // Normal drain / healthy
@@ -20,14 +31,21 @@ class AppTheme {
   static const Color textSecondary = Color(0xFF9E9E9E);
   static const Color textMuted = Color(0xFF616161);
 
-  static ThemeData get theme {
+  // Light text colors
+  static const Color textPrimaryLight = Color(0xFF1A1A1A);
+  static const Color textSecondaryLight = Color(0xFF5F6368);
+  static const Color textMutedLight = Color(0xFF80868B);
+
+  static ThemeData get theme => darkTheme;
+
+  static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: pureOledBackground,
       colorScheme: const ColorScheme.dark(
-        surface: surface,
-        surfaceContainerHighest: surfaceVariant,
+        surface: surfaceDark,
+        surfaceContainerHighest: surfaceVariantDark,
         primary: accentGreen,
         secondary: chargingCyan,
         error: crimson,
@@ -35,10 +53,10 @@ class AppTheme {
         onError: Colors.white,
       ),
       cardTheme: CardThemeData(
-        color: surface,
+        color: surfaceDark,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          side: const BorderSide(color: surfaceBorder, width: 1),
+          side: const BorderSide(color: surfaceBorderDark, width: 1),
           borderRadius: BorderRadius.circular(16),
         ),
       ),
@@ -54,16 +72,44 @@ class AppTheme {
           letterSpacing: 0.5,
         ),
       ),
-      chipTheme: ChipThemeData(
-        backgroundColor: surfaceVariant,
-        side: const BorderSide(color: surfaceBorder, width: 1),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        labelStyle: const TextStyle(
-          color: textPrimary,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
+    );
+  }
+
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: lightBackground,
+      colorScheme: const ColorScheme.light(
+        surface: surfaceLight,
+        surfaceContainerHighest: surfaceVariantLight,
+        primary: Color(0xFF00C853),
+        secondary: Color(0xFF00B0FF),
+        error: crimson,
+        onSurface: textPrimaryLight,
+        onError: Colors.white,
+      ),
+      cardTheme: CardThemeData(
+        color: surfaceLight,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: surfaceBorderLight, width: 1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: lightBackground,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          color: textPrimaryLight,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
         ),
       ),
     );
   }
 }
+
