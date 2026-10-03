@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Handler
@@ -40,6 +42,19 @@ class PowerWardenService : Service() {
         var listener: ((Map<String, Any>) -> Unit)? = null
     }
 
+    private val powerConnectionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            // When user plugs or unplugs charger, immediately sample and broadcast to UI & notification!
+            serviceScope.launch {
+                val metrics = sampleMetrics()
+                withContext(Dispatchers.Main) {
+                    listener?.invoke(metrics)
+                }
+                updateSmartNotification(metrics)
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         batteryProbe = BatteryProbe(this)
@@ -49,6 +64,13 @@ class PowerWardenService : Service() {
         thermalObserver.start()
         screenObserver.start()
         createNotificationChannel()
+
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+        }
+        registerReceiver(powerConnectionReceiver, filter)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -222,6 +244,9 @@ class PowerWardenService : Service() {
     override fun onDestroy() {
         isRunning = false
         handler.removeCallbacks(tickerRunnable)
+        try {
+            unregisterReceiver(powerConnectionReceiver)
+        } catch (_: Exception) {}
         thermalObserver.stop()
         screenObserver.stop()
         serviceScope.cancel()

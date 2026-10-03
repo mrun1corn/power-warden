@@ -276,18 +276,24 @@ class PrivilegedExecutor(private val context: Context) {
                         }
 
                         if (!pkgName.startsWith("[") && pkgName.isNotBlank() && (pkgName.contains(".") || pkgName.contains(":"))) {
-                            val cleanName = when {
+                            val cleanPkg = when {
                                 pkgName.contains("/") -> pkgName.substringAfterLast("/")
                                 pkgName.contains(":") -> pkgName.substringBefore(":")
                                 else -> pkgName
                             }
 
-                            val appLabel = cleanName.substringAfterLast(".").replace("_", " ").capitalizeWords()
+                            // Query Android PackageManager for the real localized human app label
+                            val appLabel = try {
+                                val appInfo = packageManager.getApplicationInfo(cleanPkg, 0)
+                                packageManager.getApplicationLabel(appInfo).toString()
+                            } catch (_: Exception) {
+                                cleanPkg.substringAfterLast(".").replace("_", " ").capitalizeWords()
+                            }
 
                             list.add(
                                 mapOf(
                                     "pid" to pid,
-                                    "packageName" to cleanName,
+                                    "packageName" to cleanPkg,
                                     "name" to appLabel,
                                     "cpuPercent" to Math.round(cpuPercent * 10.0) / 10.0,
                                     "ramMb" to ramMb,
