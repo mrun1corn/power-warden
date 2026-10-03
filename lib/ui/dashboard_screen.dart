@@ -234,9 +234,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // Anomaly Incidents Section
+                  // Sentinel Log Header with Clear All Action
                   Row(
                     children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentGreen.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.history_rounded, size: 14, color: AppTheme.accentGreen),
+                      ),
+                      const SizedBox(width: 8),
                       const Text(
                         'SENTINEL LOG',
                         style: TextStyle(
@@ -247,10 +256,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                       const Spacer(),
-                      Text(
-                        '${_incidents.length} Events',
-                        style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                      ),
+                      if (_incidents.isNotEmpty)
+                        InkWell(
+                          onTap: () {
+                            setState(() => _incidents.clear());
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Text(
+                              'Clear History',
+                              style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                            ),
+                          ),
+                        )
+                      else
+                        Text(
+                          '${_incidents.length} Events',
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -298,11 +321,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           incident: incident,
                           onRemediate: () async {
                             if (incident.culpritPackage != null) {
-                              await _telemetryService.remediateApp(incident.culpritPackage!);
+                              final ok = await _telemetryService.remediateApp(incident.culpritPackage!);
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Tamed ${incident.culpritPackage}')),
+                                  SnackBar(
+                                    content: Text(ok
+                                        ? '✓ Force-stopped ${incident.culpritPackage}'
+                                        : 'Could not stop ${incident.culpritPackage} (requires Shizuku or Wireless ADB)'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
                                 );
+                                setState(() {
+                                  final idx = _incidents.indexOf(incident);
+                                  if (idx != -1) {
+                                    _incidents[idx] = incident.copyWith(isRemediated: true);
+                                  }
+                                });
                               }
                             }
                           },
@@ -450,18 +484,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 16, color: AppTheme.textSecondary),
-                        tooltip: 'Force Stop',
-                        onPressed: () async {
-                          await _telemetryService.remediateApp(pkg);
+                      InkWell(
+                        onTap: () async {
+                          final ok = await _telemetryService.remediateApp(pkg);
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Tamed $name')),
+                              SnackBar(
+                                content: Text(ok ? '✓ Force-stopped $name' : 'Could not stop $name (requires Shizuku or Wireless ADB)'),
+                                duration: const Duration(seconds: 2),
+                              ),
                             );
                             _loadProcesses();
                           }
                         },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.crimson.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppTheme.crimson.withOpacity(0.3)),
+                          ),
+                          child: const Text(
+                            'STOP',
+                            style: TextStyle(
+                              color: AppTheme.crimson,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
