@@ -176,6 +176,16 @@ class TelemetryService {
     }
   }
 
+  /// Manually attempts Kadb connect on a port
+  Future<bool> connectKadbLocal(int port) async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('connectKadbLocal', {'port': port});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Subscribes to live stream of hardware telemetry samples.
   Stream<TelemetrySample> get telemetryStream {
     _sampleStream ??= _eventChannel

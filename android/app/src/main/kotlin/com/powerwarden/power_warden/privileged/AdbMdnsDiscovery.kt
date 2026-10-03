@@ -5,7 +5,6 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 
 /**
  * Discovers Wireless Debugging pairing and connection ports on localhost / local network
@@ -30,6 +29,9 @@ class AdbMdnsDiscovery(private val context: Context) {
     private var pairingDiscoveryListener: NsdManager.DiscoveryListener? = null
     private var connectDiscoveryListener: NsdManager.DiscoveryListener? = null
 
+    private var isResolving = false
+    private val resolveQueue = mutableListOf<NsdServiceInfo>()
+
     fun startDiscovery() {
         startPairingDiscovery()
         startConnectDiscovery()
@@ -43,7 +45,7 @@ class AdbMdnsDiscovery(private val context: Context) {
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 if (serviceInfo.serviceType.contains("_adb-tls-pairing")) {
-                    resolveService(serviceInfo) { port ->
+                    enqueueResolve(serviceInfo) { port ->
                         discoveredPairingPort = port
                         mainHandler.post {
                             onPairingPortDiscovered?.invoke(port)
@@ -75,7 +77,7 @@ class AdbMdnsDiscovery(private val context: Context) {
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 if (serviceInfo.serviceType.contains("_adb-tls-connect")) {
-                    resolveService(serviceInfo) { port ->
+                    enqueueResolve(serviceInfo) { port ->
                         discoveredConnectPort = port
                         mainHandler.post {
                             onConnectPortDiscovered?.invoke(port)
@@ -99,17 +101,48 @@ class AdbMdnsDiscovery(private val context: Context) {
         }
     }
 
-    private fun resolveService(serviceInfo: NsdServiceInfo, onResolved: (Int) -> Unit) {
-        nsdManager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
-            override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
+    @Synchronized
+    private fun enqueueResolve(serviceInfo: NsdServiceInfo, onResolved: (Int) -> Unit) {
+        if (isResolving) {
+            resolveQueue.add(serviceInfo)
+            return
+        }
 
-            override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-                val port = serviceInfo.port
-                if (port > 0) {
-                    onResolved(port)
+        isResolving = true
+        try {
+            nsdManager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
+                override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+                    processNextResolve()
+                }
+
+                override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                    val port = serviceInfo.port
+                    if (port > 0) {
+                        onResolved(port)
+                    }
+                    processNextResolve()
+                }
+            })
+        } catch (_: Exception) {
+            processNextResolve()
+        }
+    }
+
+    @Synchronized
+    private fun processNextResolve() {
+        isResolving = false
+        if (resolveQueue.isNotEmpty()) {
+            val next = resolveQueue.removeAt(0)
+            enqueueResolve(next) { port ->
+                if (next.serviceType.contains("_adb-tls-pairing")) {
+                    discoveredPairingPort = port
+                    mainHandler.post { onPairingPortDiscovered?.invoke(port) }
+                } else if (next.serviceType.contains("_adb-tls-connect")) {
+                    discoveredConnectPort = port
+                    mainHandler.post { onConnectPortDiscovered?.invoke(port) }
                 }
             }
-        })
+        }
     }
 
     fun stopDiscovery() {
@@ -121,5 +154,7 @@ class AdbMdnsDiscovery(private val context: Context) {
             try { nsdManager.stopServiceDiscovery(it) } catch (_: Exception) {}
             connectDiscoveryListener = null
         }
+        resolveQueue.clear()
+        isResolving = false
     }
 }

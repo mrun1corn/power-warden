@@ -86,7 +86,11 @@ class PrivilegedExecutor(private val context: Context) {
 
             if (connectPort != null && connectPort > 0) {
                 try {
-                    activeKadb = com.flyfishxu.kadb.Kadb.create("127.0.0.1", connectPort)
+                    val kadbInstance = com.flyfishxu.kadb.Kadb.create("127.0.0.1", connectPort)
+                    val ping = kadbInstance.shell("echo ping")
+                    if (ping.exitCode == 0) {
+                        activeKadb = kadbInstance
+                    }
                 } catch (_: Exception) {}
             }
             true
@@ -100,10 +104,11 @@ class PrivilegedExecutor(private val context: Context) {
      */
     suspend fun connectKadb(port: Int): Boolean = withContext(Dispatchers.IO) {
         try {
-            activeKadb = com.flyfishxu.kadb.Kadb.create("127.0.0.1", port)
-            val resp = activeKadb?.shell("echo ping")
-            val ok = resp?.exitCode == 0
+            val candidate = com.flyfishxu.kadb.Kadb.create("127.0.0.1", port)
+            val resp = candidate.shell("echo ping")
+            val ok = resp.exitCode == 0
             if (ok) {
+                activeKadb = candidate
                 context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean("is_kadb_paired", true)
@@ -116,9 +121,7 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     fun hasKadbConnected(): Boolean {
-        if (activeKadb != null) return true
-        val prefs = context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
-        return prefs.getBoolean("is_kadb_paired", false)
+        return activeKadb != null
     }
 
     /**
@@ -328,6 +331,15 @@ class PrivilegedExecutor(private val context: Context) {
             "revoke_wakelock" -> "cmd appops set $packageName WAKE_LOCK ignore"
             else -> "am force-stop $packageName"
         }
+
+        // Must have verified elevated privilege: Shizuku or active Kadb session
+        val hasShizukuElevated = isShizukuAvailable() && hasShizukuPermission() && shizukuNewProcessMethod != null
+        val hasKadbElevated = activeKadb != null
+
+        if (!hasShizukuElevated && !hasKadbElevated) {
+            return@withContext false
+        }
+
         val res = executeCommand(cmd)
         res.isSuccess
     }

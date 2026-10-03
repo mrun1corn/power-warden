@@ -42,7 +42,7 @@ class MainActivity : FlutterActivity() {
         var lastPostedPort: Int? = -1
 
         mdnsDiscovery.onPairingPortDiscovered = { port ->
-            if (port != lastPostedPort && !privilegedExecutor.hasKadbConnected()) {
+            if (port != lastPostedPort) {
                 lastPostedPort = port
                 pairingNotificationHelper.showPairingNotification(port)
             }
@@ -190,6 +190,13 @@ class MainActivity : FlutterActivity() {
                     val connectPort = mdnsDiscovery.discoveredConnectPort
                     activityScope.launch {
                         val ok = privilegedExecutor.pairKadb(port, code, connectPort)
+                        result.success(ok)
+                    }
+                }
+                "connectKadbLocal" -> {
+                    val port = call.argument<Int>("port") ?: (mdnsDiscovery.discoveredConnectPort ?: 5555)
+                    activityScope.launch {
+                        val ok = privilegedExecutor.connectKadb(port)
                         result.success(ok)
                     }
                 }
