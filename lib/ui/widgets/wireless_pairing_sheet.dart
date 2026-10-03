@@ -227,39 +227,6 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (widget.hasKadb) ...[
-                              Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accentGreen.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppTheme.accentGreen.withOpacity(0.4)),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.check_circle_rounded, color: AppTheme.accentGreen, size: 24),
-                                    SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Wireless ADB Granted & Active',
-                                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                          ),
-                                          SizedBox(height: 2),
-                                          Text(
-                                            'Pairing completed successfully. Sentinel has elevated access.',
-                                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                            ],
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -286,7 +253,7 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                                   ),
                                   const SizedBox(height: 6),
                                   const Text(
-                                    '1. Tap the button below to jump straight to Developer Settings.\n2. Tap "Pair device with pairing code".\n3. Swipe down notification shade to enter the 6-digit code without switching apps!',
+                                    '1. Tap the button below to jump straight to Developer Settings.\n2. Tap "Pair device with pairing code".\n3. Note the 5-digit Port & 6-digit Code shown on screen and enter them below.',
                                     style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, height: 1.4),
                                   ),
                                   const SizedBox(height: 10),

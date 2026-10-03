@@ -35,7 +35,8 @@ class _SetupScreenState extends State<SetupScreen> {
     if (mounted) {
       setState(() {
         _elevatedStatus = status;
-        _isPaired = status['hasAnyElevatedAccess'] == true;
+        // Strictly verify active live elevated connection (Active Kadb socket or Shizuku permission)
+        _isPaired = status['hasKadb'] == true || status['hasShizukuPermission'] == true;
       });
     }
   }
@@ -53,7 +54,7 @@ class _SetupScreenState extends State<SetupScreen> {
       builder: (_) => WirelessPairingSheet(
         hasShizuku: _elevatedStatus['hasShizuku'] ?? false,
         hasPermission: _elevatedStatus['hasShizukuPermission'] ?? false,
-        hasKadb: _elevatedStatus['hasKadb'] ?? false,
+        hasKadb: false, // Always allow entering port & pairing code in pairing sheet!
         onAuthorized: () async {
           await _checkStatus();
           if (mounted) {
