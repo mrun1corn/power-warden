@@ -10,11 +10,11 @@ class AppTheme {
   static const Color surfaceVariantDark = Color(0xFF1E1E1E);
   static const Color surfaceBorderDark = Color(0xFF2C2C2C);
 
-  // Clean Light Palette
-  static const Color lightBackground = Color(0xFFF8F9FA);
-  static const Color surfaceLight = Color(0xFFFFFFFF);
+  // Clean Light Palette (Pure 100% White)
+  static const Color lightBackground = Color(0xFFFFFFFF);
+  static const Color surfaceLight = Color(0xFFF8F9FA);
   static const Color surfaceVariantLight = Color(0xFFF1F3F5);
-  static const Color surfaceBorderLight = Color(0xFFE9ECEF);
+  static const Color surfaceBorderLight = Color(0xFFE5E7EB);
 
   // Backwards compatibility aliases for dark theme default
   static const Color surface = surfaceDark;

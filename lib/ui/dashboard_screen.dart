@@ -307,10 +307,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final sample = _currentSample;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? AppTheme.pureOledBackground : AppTheme.lightBackground;
+    final surfaceColor = isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight;
+    final surfaceBorder = isDark ? AppTheme.surfaceBorderDark : AppTheme.surfaceBorderLight;
+    final textColor = isDark ? AppTheme.textPrimary : AppTheme.textPrimaryLight;
+    final textMuted = isDark ? AppTheme.textMuted : AppTheme.textMutedLight;
 
     return Scaffold(
-      backgroundColor: AppTheme.pureOledBackground,
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
+        backgroundColor: scaffoldBg,
         title: Row(
           children: [
             Container(
@@ -322,7 +329,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            const Text('PowerWarden'),
+            Text(
+              'PowerWarden',
+              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         actions: [
@@ -386,11 +396,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
 
                   // Battery Guru Hero Card
-                  _buildBatteryGuruHeroCard(sample),
+                  _buildBatteryGuruHeroCard(sample, surfaceColor, surfaceBorder, textColor, textMuted),
                   const SizedBox(height: 12),
 
                   // 3-Metric Clean Telemetry Ribbon (Current mA, Temp °C, Voltage V)
-                  _buildTelemetryRibbon(sample),
+                  _buildTelemetryRibbon(sample, surfaceColor, surfaceBorder, textColor, textMuted),
                   const SizedBox(height: 16),
 
                   // Discharge Timeline
@@ -398,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 16),
 
                   // Active Process Consumption Section
-                  _buildProcessUsageSection(),
+                  _buildProcessUsageSection(surfaceColor, surfaceBorder, textColor, textMuted),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -454,21 +464,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   /// App resource and energy drainers list
-  Widget _buildProcessUsageSection() {
+  Widget _buildProcessUsageSection(Color surfaceColor, Color surfaceBorder, Color textColor, Color textMuted) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(Icons.apps_rounded, size: 16, color: AppTheme.textSecondary),
+            Icon(Icons.apps_rounded, size: 16, color: textMuted),
             const SizedBox(width: 6),
-            const Text(
+            Text(
               'ACTIVE APP ENERGY CONSUMPTION',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.0,
-                color: AppTheme.textSecondary,
+                color: textMuted,
               ),
             ),
             const Spacer(),
@@ -486,30 +496,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.surface,
+              color: surfaceColor,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppTheme.surfaceBorder),
+              border: Border.all(color: surfaceBorder),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
                 'No heavy apps consuming active CPU cycles.\nTap refresh or authorize Shizuku for deep inspection.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                style: TextStyle(color: textMuted, fontSize: 12),
               ),
             ),
           )
         else
           Container(
             decoration: BoxDecoration(
-              color: AppTheme.surface,
+              color: surfaceColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.surfaceBorder),
+              border: Border.all(color: surfaceBorder),
             ),
             child: ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _topProcesses.length,
-              separatorBuilder: (_, _) => Divider(height: 1, color: AppTheme.surfaceBorder.withOpacity(0.5)),
+              separatorBuilder: (_, _) => Divider(height: 1, color: surfaceBorder),
               itemBuilder: (context, idx) {
                 final proc = _topProcesses[idx];
                 final name = (proc['name'] as String?) ?? 'App';
@@ -754,7 +764,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildBatteryGuruHeroCard(TelemetrySample sample) {
+  Widget _buildBatteryGuruHeroCard(
+    TelemetrySample sample,
+    Color surfaceColor,
+    Color surfaceBorder,
+    Color textColor,
+    Color textMuted,
+  ) {
     final isCharging = sample.isCharging;
     final level = sample.batteryLevel;
     final absMa = sample.currentMilliamps.abs();
@@ -773,9 +789,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.surfaceBorder),
+        border: Border.all(color: surfaceBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -793,8 +809,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Text(
                           '$level',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: textColor,
                             fontSize: 56,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -1.5,
@@ -814,7 +830,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.12),
+                            color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -833,8 +849,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       isCharging
                           ? '⚡ Fast Charging · Full in ~${(hoursRemaining * 60).round()}m'
                           : '🔋 Battery Healthy · ~${hoursRemaining.toStringAsFixed(1)}h remaining',
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
+                      style: TextStyle(
+                        color: textMuted,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -849,9 +865,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppTheme.amber.withOpacity(0.12),
+                      color: AppTheme.amber.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.amber.withOpacity(0.3)),
+                      border: Border.all(color: AppTheme.amber.withValues(alpha: 0.3)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
@@ -873,26 +889,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 18),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: level / 100.0,
-              minHeight: 8,
-              backgroundColor: AppTheme.surfaceVariant,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isCharging
-                    ? AppTheme.chargingCyan
-                    : (level <= 20 ? AppTheme.crimson : AppTheme.accentGreen),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildTelemetryRibbon(TelemetrySample sample) {
+  Widget _buildTelemetryRibbon(
+    TelemetrySample sample,
+    Color surfaceColor,
+    Color surfaceBorder,
+    Color textColor,
+    Color textMuted,
+  ) {
     final absMa = sample.currentMilliamps.abs();
     final isCharging = sample.isCharging;
     final volts = (sample.voltageMv / 1000.0).toStringAsFixed(2);
@@ -906,9 +914,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.surfaceBorder),
+        border: Border.all(color: surfaceBorder),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -919,24 +927,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
             label: isCharging ? 'CHARGE' : 'CURRENT',
             value: currentLabel,
           ),
-          Container(width: 1, height: 32, color: AppTheme.surfaceBorder),
+          Container(width: 1, height: 32, color: surfaceBorder),
           _buildRibbonItem(
             icon: Icons.bolt_rounded,
             color: isCharging ? AppTheme.chargingCyan : AppTheme.amber,
             label: 'POWER',
             value: '${watts}W',
           ),
-          Container(width: 1, height: 32, color: AppTheme.surfaceBorder),
+          Container(width: 1, height: 32, color: surfaceBorder),
           _buildRibbonItem(
             icon: Icons.thermostat_rounded,
             color: sample.temperatureCelsius >= 38.0 ? AppTheme.amber : AppTheme.accentGreen,
             label: 'TEMP',
             value: '${sample.temperatureCelsius.toStringAsFixed(1)}°C',
           ),
-          Container(width: 1, height: 32, color: AppTheme.surfaceBorder),
+          Container(width: 1, height: 32, color: surfaceBorder),
           _buildRibbonItem(
             icon: Icons.battery_charging_full_rounded,
-            color: AppTheme.textSecondary,
+            color: textMuted,
             label: 'VOLTS',
             value: '${volts}V',
           ),

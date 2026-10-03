@@ -141,7 +141,8 @@ class PrivilegedExecutor(private val context: Context) {
 
     fun isKadbPaired(): Boolean {
         val prefs = context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
-        return prefs.getBoolean("is_kadb_paired", false)
+        val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        return prefs.getBoolean("is_kadb_paired", false) || flutterPrefs.getBoolean("flutter.is_kadb_paired", false)
     }
 
     fun hasPermanentAdbPermissions(): Boolean {

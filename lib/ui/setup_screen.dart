@@ -55,13 +55,23 @@ class _SetupScreenState extends State<SetupScreen> {
         hasPermission: _elevatedStatus['hasShizukuPermission'] ?? false,
         hasKadb: _elevatedStatus['hasKadb'] ?? false,
         onAuthorized: () async {
+          // Immediately persist paired state in app memory
+          await _telemetryService.setPrefBool('is_kadb_paired', true);
           await _checkStatus();
           if (mounted) {
+            setState(() {
+              _isPaired = true;
+              _elevatedStatus['hasKadb'] = true;
+              _elevatedStatus['hasAnyElevatedAccess'] = true;
+            });
             Navigator.pop(context);
           }
         },
       ),
-    );
+    ).then((_) async {
+      // Re-check status when user returns or closes the pairing sheet
+      await _checkStatus();
+    });
   }
 
   @override
