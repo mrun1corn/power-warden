@@ -68,6 +68,61 @@ class PowerWardenService : Service() {
         return START_STICKY
     }
 
+    private fun updateSmartNotification(metrics: Map<String, Any>) {
+        val isCharging = (metrics["isCharging"] as? Boolean) ?: false
+        val level = (metrics["batteryLevel"] as? Int) ?: 50
+        val currentMa = (metrics["currentMa"] as? Int) ?: 0
+        val absMa = Math.abs(currentMa)
+        val temp = (metrics["temperatureCelsius"] as? Double) ?: 35.0
+        val voltageMv = (metrics["voltageMv"] as? Int) ?: 4000
+        val watts = String.format("%.1f", (voltageMv / 1000.0) * (absMa / 1000.0))
+        val percentPerHour = String.format("%.1f", (absMa / 4500.0) * 100.0)
+
+        val title: String
+        val content: String
+
+        if (isCharging) {
+            title = "⚡ Charging: $level% · +$absMa mA (${watts}W)"
+            content = "Temp: ${String.format("%.1f", temp)}°C · Fast charging healthy"
+        } else if (currentDrainSpike(metrics)) {
+            title = "⚠️ High Discharge: $level% · -$absMa mA ($percentPerHour%/hr)"
+            content = "Heavy battery burn detected · Temp: ${String.format("%.1f", temp)}°C"
+        } else {
+            val hoursLeft = String.format("%.1f", level * 0.22)
+            title = "🔋 $level% · -$absMa mA ($percentPerHour%/hr)"
+            content = "About ${hoursLeft}h left · ${String.format("%.1f", temp)}°C · All calm"
+        }
+
+        val openIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = openIntent?.let {
+            android.app.PendingIntent.getActivity(
+                this,
+                1005,
+                it,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) android.app.PendingIntent.FLAG_IMMUTABLE else 0
+            )
+        }
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
+
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun currentDrainSpike(metrics: Map<String, Any>): Boolean {
+        val isScreenOn = (metrics["isScreenOn"] as? Boolean) ?: true
+        val currentMa = Math.abs((metrics["currentMa"] as? Int) ?: 0)
+        return (!isScreenOn && currentMa > 300) || (isScreenOn && currentMa > 1200)
+    }
+
     private fun startForegroundWithNotification() {
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("PowerWarden Active")
@@ -107,6 +162,8 @@ class PowerWardenService : Service() {
         }
     }
 
+    private var lastNotificationUpdateMs = 0L
+
     private val tickerRunnable = Runnable {
         serviceScope.launch {
             val metrics = sampleMetrics()
@@ -114,8 +171,18 @@ class PowerWardenService : Service() {
                 listener?.invoke(metrics)
             }
 
-            // Adaptive Zero-Wake interval calculation
+            // Smart notification update: updates smoothly without waking device unnecessarily
+            val now = System.currentTimeMillis()
             val isScreenOn = screenObserver.isInteractive()
+            if (isScreenOn && (now - lastNotificationUpdateMs >= 4_000L)) {
+                lastNotificationUpdateMs = now
+                updateSmartNotification(metrics)
+            } else if (!isScreenOn && (now - lastNotificationUpdateMs >= 60_000L)) {
+                lastNotificationUpdateMs = now
+                updateSmartNotification(metrics)
+            }
+
+            // Adaptive Zero-Wake interval calculation
             val currentDrain = (metrics["currentMa"] as? Int) ?: 0
 
             val nextIntervalMs = when {
