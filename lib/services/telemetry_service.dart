@@ -58,12 +58,20 @@ class TelemetryService {
       if (res != null) {
         return {
           'hasShizuku': (res['hasShizuku'] as bool?) ?? false,
+          'hasShizukuPermission': (res['hasShizukuPermission'] as bool?) ?? false,
           'hasPermission': (res['hasPermission'] as bool?) ?? false,
           'hasKadb': (res['hasKadb'] as bool?) ?? false,
+          'hasAnyElevatedAccess': (res['hasAnyElevatedAccess'] as bool?) ?? false,
         };
       }
     } catch (_) {}
-    return {'hasShizuku': false, 'hasPermission': false, 'hasKadb': false};
+    return {
+      'hasShizuku': false,
+      'hasShizukuPermission': false,
+      'hasPermission': false,
+      'hasKadb': false,
+      'hasAnyElevatedAccess': false,
+    };
   }
 
   Future<bool> openWirelessDebuggingSettings() async {

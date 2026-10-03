@@ -69,8 +69,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         _loadProcesses();
         final s = await _telemetryService.getElevatedStatus();
-        if (s['hasPermission'] != _elevatedStatus['hasPermission'] ||
-            s['hasShizuku'] != _elevatedStatus['hasShizuku']) {
+        if (s['hasAnyElevatedAccess'] != _elevatedStatus['hasAnyElevatedAccess'] ||
+            s['hasKadb'] != _elevatedStatus['hasKadb'] ||
+            s['hasShizukuPermission'] != _elevatedStatus['hasShizukuPermission']) {
           setState(() => _elevatedStatus = s);
         }
       }
@@ -122,7 +123,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => WirelessPairingSheet(
         hasShizuku: _elevatedStatus['hasShizuku'] ?? false,
-        hasPermission: _elevatedStatus['hasPermission'] ?? false,
+        hasPermission: _elevatedStatus['hasShizukuPermission'] ?? false,
         hasKadb: _elevatedStatus['hasKadb'] ?? false,
         onAuthorized: () async {
           final s = await _telemetryService.getElevatedStatus();
@@ -216,10 +217,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       temperatureCelsius: sample.temperatureCelsius,
                       voltageMv: sample.voltageMv,
                       isScreenOn: sample.isScreenOn,
-                      hasElevatedAccess: _elevatedStatus['hasPermission'] == true,
+                      hasElevatedAccess: _elevatedStatus['hasAnyElevatedAccess'] == true,
                       elevatedBackend: (_elevatedStatus['hasKadb'] == true)
                           ? ElevatedBackendType.kadb
-                          : ((_elevatedStatus['hasPermission'] == true)
+                          : ((_elevatedStatus['hasShizukuPermission'] == true)
                               ? ElevatedBackendType.shizuku
                               : ElevatedBackendType.none),
                       onTapElevated: _showPairingModal,

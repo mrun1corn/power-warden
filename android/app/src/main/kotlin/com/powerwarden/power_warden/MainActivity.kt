@@ -165,8 +165,10 @@ class MainActivity : FlutterActivity() {
                     val hasKadb = privilegedExecutor.hasKadbConnected()
                     val statusMap = mapOf(
                         "hasShizuku" to hasShizuku,
-                        "hasPermission" to (hasPerm || hasKadb),
-                        "hasKadb" to hasKadb
+                        "hasShizukuPermission" to hasPerm,
+                        "hasPermission" to hasPerm,
+                        "hasKadb" to hasKadb,
+                        "hasAnyElevatedAccess" to (hasPerm || hasKadb)
                     )
                     result.success(statusMap)
                 }
