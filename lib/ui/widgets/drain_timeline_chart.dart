@@ -34,9 +34,24 @@ class DrainTimelineChart extends StatelessWidget {
       currentSpots.add(FlSpot(i.toDouble(), samples[i].currentMilliamps.toDouble()));
     }
 
+    // Find bounds with safety margin to prevent labels from colliding or clipping
+    double minVal = double.infinity;
+    double maxVal = double.negativeInfinity;
+    for (final s in currentSpots) {
+      if (s.y < minVal) minVal = s.y;
+      if (s.y > maxVal) maxVal = s.y;
+    }
+    if (minVal.isInfinite) minVal = 0.0;
+    if (maxVal.isInfinite) maxVal = 1000.0;
+
+    final range = (maxVal - minVal).abs();
+    final yInterval = (range > 200 ? (range / 3.0).roundToDouble() : 100.0).clamp(50.0, 500.0);
+    final chartMinY = (minVal - 60).clamp(0.0, double.infinity);
+    final chartMaxY = maxVal + 60;
+
     return Container(
       height: 240,
-      padding: const EdgeInsets.only(top: 16, bottom: 8, right: 16, left: 8),
+      padding: const EdgeInsets.only(top: 16, bottom: 12, right: 16, left: 4),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -75,6 +90,8 @@ class DrainTimelineChart extends StatelessWidget {
           Expanded(
             child: LineChart(
               LineChartData(
+                minY: chartMinY,
+                maxY: chartMaxY,
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
@@ -91,8 +108,12 @@ class DrainTimelineChart extends StatelessWidget {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 48,
+                      reservedSize: 52,
+                      interval: yInterval,
                       getTitlesWidget: (val, meta) {
+                        if (val == meta.max || val == meta.min) {
+                          return const SizedBox.shrink(); // Prevent edge clipping at top & bottom borders!
+                        }
                         return Text(
                           '${val.toInt()} mA',
                           style: const TextStyle(color: AppTheme.textMuted, fontSize: 9, fontWeight: FontWeight.w600),

@@ -611,11 +611,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   pkg,
                                   style: TextStyle(
                                     color: subtitleColor,
-                                    fontSize: 10,
+                                    fontSize: 9.5,
                                     fontFamily: 'monospace',
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                  softWrap: true,
                                 ),
                               ],
                             ),
@@ -804,31 +804,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Text(
-                          '$level',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 56,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1.5,
-                            height: 1.0,
-                          ),
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '%',
-                          style: TextStyle(
-                            color: statusColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              '$level',
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 56,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -1.5,
+                                height: 1.0,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '%',
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(width: 14),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
