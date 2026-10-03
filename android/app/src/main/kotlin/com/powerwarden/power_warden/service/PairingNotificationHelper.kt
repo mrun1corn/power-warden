@@ -82,7 +82,7 @@ class PairingNotificationHelper(private val context: Context) {
 
         val replyAction = NotificationCompat.Action.Builder(
             android.R.drawable.ic_input_add,
-            "Code",
+            "Enter Code",
             replyPendingIntent
         )
             .addRemoteInput(remoteInput)
@@ -91,12 +91,11 @@ class PairingNotificationHelper(private val context: Context) {
         val portShort = if (discoveredPort != null) "Port: $discoveredPort" else "Waiting for port..."
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Wireless ADB Pairing")
-            .setContentText("$portShort · Tap Code to enter")
+            .setContentTitle("Wireless ADB Pairing Helper")
+            .setContentText("$portShort · Tap 'Enter Code' below")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
-            .setOnlyAlertOnce(true)
             .addAction(replyAction)
             .addAction(android.R.drawable.ic_menu_preferences, "Settings", openSettingsPending)
             .build()

@@ -39,13 +39,14 @@ class MainActivity : FlutterActivity() {
         mdnsDiscovery = com.powerwarden.power_warden.privileged.AdbMdnsDiscovery(this)
         pairingNotificationHelper = com.powerwarden.power_warden.service.PairingNotificationHelper(this)
 
-        var lastPostedPort: Int? = -1
-
         mdnsDiscovery.onPairingPortDiscovered = { port ->
-            if (port != lastPostedPort) {
-                lastPostedPort = port
-                pairingNotificationHelper.showPairingNotification(port)
-            }
+            pairingNotificationHelper.showPairingNotification(port)
+        }
+
+        // Auto-start discovery and attempt auto-reconnect on launch
+        mdnsDiscovery.startDiscovery()
+        activityScope.launch {
+            privilegedExecutor.autoReconnect()
         }
 
         com.powerwarden.power_warden.service.PairingNotificationHelper.onCodeReceivedListener = { code ->
@@ -122,6 +123,9 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "openWirelessDebuggingSettings" -> {
+                    mdnsDiscovery.startDiscovery()
+                    pairingNotificationHelper.showPairingNotification(mdnsDiscovery.discoveredPairingPort)
+
                     val intents = listOf(
                         // Intent 1: Direct Wireless Debugging Sub-Fragment (Android 11+)
                         Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS"),

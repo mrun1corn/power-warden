@@ -112,6 +112,7 @@ class PrivilegedExecutor(private val context: Context) {
                 context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean("is_kadb_paired", true)
+                    .putInt("last_connect_port", port)
                     .apply()
             }
             ok
@@ -122,6 +123,22 @@ class PrivilegedExecutor(private val context: Context) {
 
     fun hasKadbConnected(): Boolean {
         return activeKadb != null
+    }
+
+    /**
+     * Attempts automatic reconnection to the last known Wireless Debugging connect port.
+     */
+    suspend fun autoReconnect(): Boolean = withContext(Dispatchers.IO) {
+        if (activeKadb != null) return@withContext true
+        val prefs = context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
+        val isPaired = prefs.getBoolean("is_kadb_paired", false)
+        val lastPort = prefs.getInt("last_connect_port", -1)
+
+        if (isPaired && lastPort > 0) {
+            connectKadb(lastPort)
+        } else {
+            false
+        }
     }
 
     /**

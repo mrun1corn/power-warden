@@ -67,7 +67,9 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
   @override
   void dispose() {
     _portPollingTimer?.cancel();
-    _telemetryService.stopMdnsDiscovery();
+    // Do NOT stop mDNS discovery or dismiss the notification here!
+    // The user needs the notification to remain visible in the status bar
+    // while they are looking at the Wireless Debugging screen or pair dialog!
     _tabController.dispose();
     _portController.dispose();
     _codeController.dispose();
