@@ -118,6 +118,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (_) => WirelessPairingSheet(
         hasShizuku: _elevatedStatus['hasShizuku'] ?? false,
         hasPermission: _elevatedStatus['hasPermission'] ?? false,
+        hasKadb: _elevatedStatus['hasKadb'] ?? false,
         onAuthorized: () async {
           final s = await _telemetryService.getElevatedStatus();
           setState(() => _elevatedStatus = s);

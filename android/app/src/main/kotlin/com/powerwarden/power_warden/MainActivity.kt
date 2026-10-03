@@ -39,8 +39,13 @@ class MainActivity : FlutterActivity() {
         mdnsDiscovery = com.powerwarden.power_warden.privileged.AdbMdnsDiscovery(this)
         pairingNotificationHelper = com.powerwarden.power_warden.service.PairingNotificationHelper(this)
 
+        var lastPostedPort: Int? = -1
+
         mdnsDiscovery.onPairingPortDiscovered = { port ->
-            pairingNotificationHelper.showPairingNotification(port)
+            if (port != lastPostedPort && !privilegedExecutor.hasKadbConnected()) {
+                lastPostedPort = port
+                pairingNotificationHelper.showPairingNotification(port)
+            }
         }
 
         com.powerwarden.power_warden.service.PairingNotificationHelper.onCodeReceivedListener = { code ->

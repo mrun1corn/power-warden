@@ -96,6 +96,7 @@ class PairingNotificationHelper(private val context: Context) {
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .addAction(replyAction)
             .addAction(android.R.drawable.ic_menu_preferences, "Settings", openSettingsPending)
             .build()
