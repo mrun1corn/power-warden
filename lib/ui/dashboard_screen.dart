@@ -7,7 +7,6 @@ import '../data/database/database.dart';
 import '../services/notification_service.dart';
 import '../services/telemetry_service.dart';
 import 'theme.dart';
-import 'widgets/anomaly_card.dart';
 import 'widgets/drain_timeline_chart.dart';
 import 'widgets/wireless_pairing_sheet.dart';
 
@@ -242,20 +241,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          // Elevated Settings icon (only when unpaired or needed)
-          IconButton(
-            icon: Icon(
-              _elevatedStatus['hasAnyElevatedAccess'] == true
-                  ? Icons.shield_rounded
-                  : Icons.shield_outlined,
-              color: _elevatedStatus['hasAnyElevatedAccess'] == true
-                  ? AppTheme.accentGreen
-                  : AppTheme.amber,
-              size: 20,
+          // Only show settings/pairing icon if elevated access is NOT granted yet
+          if (_elevatedStatus['hasAnyElevatedAccess'] != true)
+            IconButton(
+              icon: const Icon(
+                Icons.shield_outlined,
+                color: AppTheme.amber,
+                size: 20,
+              ),
+              onPressed: _showPairingModal,
+              tooltip: 'Set Up Permissions',
             ),
-            onPressed: _showPairingModal,
-            tooltip: 'Deep Diagnostics',
-          ),
           const SizedBox(width: 4),
         ],
       ),
@@ -283,115 +279,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   // Active Process Consumption Section
                   _buildProcessUsageSection(),
-                  const SizedBox(height: 16),
-
-                  // Sentinel Log Header with Clear All Action
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentGreen.withOpacity(0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.history_rounded, size: 14, color: AppTheme.accentGreen),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'SENTINEL LOG',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.0,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (_incidents.isNotEmpty)
-                        InkWell(
-                          onTap: () {
-                            setState(() => _incidents.clear());
-                          },
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                            child: Text(
-                              'Clear History',
-                              style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                            ),
-                          ),
-                        )
-                      else
-                        Text(
-                          '${_incidents.length} Events',
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  if (_incidents.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.surfaceBorder),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppTheme.accentGreen.withOpacity(0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.shield_outlined, color: AppTheme.accentGreen, size: 22),
-                          ),
-                          const SizedBox(width: 14),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Everything Calm & Healthy',
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'No background loops or battery vampires detected.',
-                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    ..._incidents.map((incident) => AnomalyCard(
-                          incident: incident,
-                          onRemediate: () async {
-                            if (incident.culpritPackage != null) {
-                              final ok = await _telemetryService.remediateApp(incident.culpritPackage!);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(ok
-                                        ? '✓ Force-stopped ${incident.culpritPackage}'
-                                        : 'Could not stop ${incident.culpritPackage} (requires Shizuku or Wireless ADB)'),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                                setState(() {
-                                  final idx = _incidents.indexOf(incident);
-                                  if (idx != -1) {
-                                    _incidents[idx] = incident.copyWith(isRemediated: true);
-                                  }
-                                });
-                              }
-                            }
-                          },
-                        )),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -463,118 +350,152 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final cpu = (proc['cpuPercent'] as num?)?.toDouble() ?? 0.0;
                 final ramMb = (proc['ramMb'] as num?)?.toInt() ?? 0;
                 final isHeavy = cpu > 10.0;
+                final isCriticalCpu = cpu > 25.0;
 
-                return ListTile(
-                  dense: true,
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isHeavy ? AppTheme.crimson.withOpacity(0.15) : AppTheme.surfaceVariant,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.android_rounded,
-                      size: 16,
-                      color: isHeavy ? AppTheme.crimson : AppTheme.textSecondary,
-                    ),
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isCriticalCpu
+                        ? AppTheme.crimson.withOpacity(0.08)
+                        : (isHeavy ? AppTheme.amber.withOpacity(0.05) : Colors.transparent),
+                    borderRadius: BorderRadius.circular(12),
+                    border: isHeavy
+                        ? Border.all(
+                            color: isCriticalCpu
+                                ? AppTheme.crimson.withOpacity(0.4)
+                                : AppTheme.amber.withOpacity(0.3),
+                            width: 1,
+                          )
+                        : null,
                   ),
-                  title: Row(
-   children: [
-     Expanded(
-       child: Text(
-         name.toUpperCase(),
-         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-         overflow: TextOverflow.ellipsis,
-       ),
-     ),
-     if (ramMb > 0)
-       Container(
-         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-         margin: const EdgeInsets.only(left: 6),
-         decoration: BoxDecoration(
-           color: AppTheme.surfaceVariant,
-           borderRadius: BorderRadius.circular(4),
-         ),
-         child: Text(
-           '${ramMb}MB RAM',
-           style: const TextStyle(color: AppTheme.textSecondary, fontSize: 9, fontWeight: FontWeight.w600),
-         ),
-       ),
-     Container(
-       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-       margin: const EdgeInsets.only(left: 6),
-       decoration: BoxDecoration(
-         color: isHeavy ? AppTheme.crimson.withOpacity(0.15) : AppTheme.accentGreen.withOpacity(0.12),
-         borderRadius: BorderRadius.circular(4),
-       ),
-       child: Text(
-         isHeavy ? 'Heavy' : 'Calm',
-         style: TextStyle(
-           color: isHeavy ? AppTheme.crimson : AppTheme.accentGreen,
-           fontSize: 9,
-           fontWeight: FontWeight.bold,
-         ),
-       ),
-     ),
-   ],
- ),
-                  subtitle: Text(
-                    pkg,
-                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 10),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isHeavy ? AppTheme.crimson.withOpacity(0.2) : AppTheme.surfaceVariant,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${cpu.toStringAsFixed(1)}% CPU',
-                          style: TextStyle(
-                            color: isHeavy ? AppTheme.crimson : AppTheme.accentGreen,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                          ),
-                        ),
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isHeavy
+                            ? (isCriticalCpu
+                                ? AppTheme.crimson.withOpacity(0.2)
+                                : AppTheme.amber.withOpacity(0.2))
+                            : AppTheme.surfaceVariant,
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        onTap: () async {
-                          final ok = await _telemetryService.remediateApp(pkg);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(ok ? '✓ Force-stopped $name' : 'Could not stop $name (requires Shizuku or Wireless ADB)'),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                            _loadProcesses();
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.crimson.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: AppTheme.crimson.withOpacity(0.3)),
-                          ),
-                          child: const Text(
-                            'STOP',
+                      child: Icon(
+                        isHeavy ? Icons.bolt_rounded : Icons.android_rounded,
+                        size: 16,
+                        color: isHeavy
+                            ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
                             style: TextStyle(
-                              color: AppTheme.crimson,
-                              fontSize: 10,
+                              color: Colors.white,
+                              fontWeight: isHeavy ? FontWeight.w800 : FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (ramMb > 0)
+                          Text(
+                            '${ramMb}MB',
+                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                          ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isHeavy
+                                ? (isCriticalCpu
+                                    ? AppTheme.crimson.withOpacity(0.2)
+                                    : AppTheme.amber.withOpacity(0.2))
+                                : AppTheme.accentGreen.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isCriticalCpu ? 'CRITICAL' : (isHeavy ? 'HEAVY' : 'CALM'),
+                            style: TextStyle(
+                              color: isHeavy
+                                  ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
+                                  : AppTheme.accentGreen,
+                              fontSize: 9,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 2.0),
+                      child: Text(
+                        pkg,
+                        style: const TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${cpu.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            color: isHeavy
+                                ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
+                                : Colors.white70,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        InkWell(
+                          onTap: () async {
+                            final ok = await _telemetryService.remediateApp(pkg);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(ok
+                                      ? '✓ Force-stopped $name'
+                                      : 'Could not stop $name (requires Shizuku or Wireless ADB)'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                              _loadProcesses();
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isHeavy
+                                  ? AppTheme.crimson.withOpacity(0.2)
+                                  : AppTheme.surfaceVariant,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isHeavy
+                                    ? AppTheme.crimson.withOpacity(0.4)
+                                    : AppTheme.surfaceBorder,
+                              ),
+                            ),
+                            child: Text(
+                              'STOP',
+                              style: TextStyle(
+                                color: isHeavy ? AppTheme.crimson : AppTheme.textSecondary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
