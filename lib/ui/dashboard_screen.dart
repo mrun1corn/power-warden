@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../domain/anomaly_engine.dart';
 import '../domain/models/anomaly_incident.dart';
@@ -352,6 +353,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final isHeavy = cpu > 10.0;
                 final isCriticalCpu = cpu > 25.0;
 
+                // Live dynamic mA attribution based on instantaneous battery discharge
+                final totalMa = (_currentSample?.currentMilliamps.abs() ?? 450);
+                final appEstimatedMa = math.max(2, (totalMa * (cpu / 100.0)).round());
+
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
@@ -444,25 +449,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${cpu.toStringAsFixed(1)}%',
+                          '~$appEstimatedMa mA',
                           style: TextStyle(
                             color: isHeavy
                                 ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
-                                : Colors.white70,
+                                : AppTheme.chargingCyan,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${cpu.toStringAsFixed(1)}%',
+                          style: const TextStyle(
+                            color: AppTheme.textMuted,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
                           ),
                         ),
                         const SizedBox(width: 10),
                         InkWell(
                           onTap: () async {
+                            final hasElevatedShell = _elevatedStatus['hasKadb'] == true || _elevatedStatus['hasShizukuPermission'] == true;
                             final ok = await _telemetryService.remediateApp(pkg);
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(ok
-                                      ? '✓ Force-stopped $name'
-                                      : 'Could not stop $name (requires Shizuku or Wireless ADB)'),
+                                      ? (hasElevatedShell
+                                          ? '✓ Force-stopped $name'
+                                          : 'Tap "Force Stop" on $name system info')
+                                      : 'Could not open $name settings'),
                                   duration: const Duration(seconds: 2),
                                 ),
                               );

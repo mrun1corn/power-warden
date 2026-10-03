@@ -466,7 +466,20 @@ class PrivilegedExecutor(private val context: Context) {
         val hasKadbElevated = activeKadb != null
 
         if (!hasShizukuElevated && !hasKadbElevated) {
-            return@withContext false
+            // Smart Fallback for unprivileged / zero-ADB state:
+            // Direct user to Android's native App Info screen so they can tap Force Stop with 1 click!
+            try {
+                withContext(Dispatchers.Main) {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = android.net.Uri.fromParts("package", packageName, null)
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                }
+                return@withContext true
+            } catch (_: Exception) {
+                return@withContext false
+            }
         }
 
         val res = executeCommand(cmd)

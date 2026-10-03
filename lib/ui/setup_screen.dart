@@ -299,63 +299,54 @@ class _SetupScreenState extends State<SetupScreen> {
           ),
         ),
         const Spacer(),
-        if (_isPaired)
-          Container(
+        InkWell(
+          onTap: _openPairing,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.accentGreen.withOpacity(0.1),
+              color: AppTheme.surfaceVariant,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.accentGreen.withOpacity(0.3)),
+              border: Border.all(
+                color: _isPaired
+                    ? AppTheme.accentGreen.withOpacity(0.4)
+                    : AppTheme.amber.withOpacity(0.4),
+              ),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: AppTheme.accentGreen),
-                SizedBox(width: 12),
+                Icon(
+                  _isPaired ? Icons.verified_user_rounded : Icons.link_rounded,
+                  color: _isPaired ? AppTheme.accentGreen : AppTheme.amber,
+                  size: 24,
+                ),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: Text(
-                    'Setup is ready. You are all set!',
-                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _isPaired ? 'Wireless ADB / Shizuku Configured' : 'Configure Shizuku or Wireless ADB',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _isPaired
+                            ? 'Pairing active. Tap to re-configure or check status.'
+                            : 'Pair once in 30s to grant permanent permissions.',
+                        style: TextStyle(
+                          color: _isPaired ? AppTheme.accentGreen : AppTheme.amber,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
               ],
             ),
-          )
-        else
-          InkWell(
-            onTap: _openPairing,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceVariant,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.amber.withOpacity(0.4)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.link_rounded, color: AppTheme.amber, size: 24),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Configure Shizuku or Wireless ADB',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Tap to pair in 30 seconds',
-                          style: TextStyle(color: AppTheme.amber, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
-                ],
-              ),
-            ),
           ),
+        ),
         const SizedBox(height: 20),
       ],
     );
