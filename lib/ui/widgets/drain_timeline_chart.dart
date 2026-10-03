@@ -103,14 +103,28 @@ class DrainTimelineChart extends StatelessWidget {
                   LineChartBarData(
                     spots: currentSpots,
                     isCurved: true,
-                    curveSmoothness: 0.2,
-                    color: AppTheme.crimson,
-                    barWidth: 2,
+                    curveSmoothness: 0.25,
+                    gradient: const LinearGradient(
+                      colors: [
+                        AppTheme.chargingCyan,
+                        AppTheme.accentGreen,
+                        AppTheme.amber,
+                      ],
+                      stops: [0.0, 0.6, 1.0],
+                    ),
+                    barWidth: 2.2,
                     isStrokeCapRound: true,
                     dotData: const FlDotData(show: false),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: AppTheme.crimson.withOpacity(0.12),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppTheme.chargingCyan.withOpacity(0.16),
+                          Colors.transparent,
+                        ],
+                      ),
                     ),
                   ),
                 ],

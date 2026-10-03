@@ -68,12 +68,13 @@ class _CurrentGaugeState extends State<CurrentGauge>
       return AppTheme.chargingCyan;
     }
     final absMa = widget.currentMa.abs();
-    if (absMa > 800) {
+    // Context-aware: 400-650mA is normal active drain while interacting with modern screens
+    if (absMa > 850) {
       return AppTheme.crimson;
-    } else if (absMa > 400) {
+    } else if (absMa > 650) {
       return AppTheme.amber;
     } else {
-      return AppTheme.accentGreen;
+      return AppTheme.chargingCyan;
     }
   }
 
@@ -84,15 +85,15 @@ class _CurrentGaugeState extends State<CurrentGauge>
 
     return Center(
       child: Container(
-        width: 280,
-        height: 250,
+        width: 250,
+        height: 200,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
               color: statusColor.withOpacity(0.08),
-              blurRadius: 40,
-              spreadRadius: 5,
+              blurRadius: 30,
+              spreadRadius: 2,
             ),
           ],
         ),
@@ -107,7 +108,7 @@ class _CurrentGaugeState extends State<CurrentGauge>
               ),
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 25.0),
+                  padding: const EdgeInsets.only(top: 15.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -226,11 +227,11 @@ class _HudGaugePainter extends CustomPainter {
         startAngle: startAngle,
         endAngle: startAngle + sweepTotal,
         colors: [
-          isCharging ? AppTheme.chargingCyan : AppTheme.accentGreen,
-          isCharging ? AppTheme.chargingCyan : AppTheme.amber,
+          isCharging ? AppTheme.chargingCyan : AppTheme.chargingCyan,
+          isCharging ? AppTheme.chargingCyan : statusColor,
           statusColor,
         ],
-        stops: const [0.0, 0.5, 1.0],
+        stops: const [0.0, 0.7, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: radius))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 10

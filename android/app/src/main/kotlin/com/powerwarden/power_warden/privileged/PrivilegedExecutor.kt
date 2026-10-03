@@ -174,9 +174,15 @@ class PrivilegedExecutor(private val context: Context) {
     suspend fun getTopProcesses(): List<Map<String, Any>> = withContext(Dispatchers.IO) {
         val list = mutableListOf<Map<String, Any>>()
 
-        // Strategy 1: Elevated / Shell 'top' parsing
+        // Strategy 1: Elevated / Shell 'top' or 'ps' parsing
         try {
-            val res = executeCommand("top -b -n 1 -m 25")
+            var res = executeCommand("top -n 1 -m 25")
+            if (!res.isSuccess || res.stdout.isBlank() || res.stdout.contains("Unknown option")) {
+                res = executeCommand("top -b -n 1 -m 25")
+            }
+            if (!res.isSuccess || res.stdout.isBlank()) {
+                res = executeCommand("ps -A -o PID,%CPU,RSS,NAME")
+            }
             if (res.isSuccess && res.stdout.isNotBlank()) {
                 val lines = res.stdout.lines()
 

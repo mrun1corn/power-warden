@@ -43,7 +43,6 @@ class MetricChips extends StatelessWidget {
               _buildBatteryChip(),
               _buildTemperatureChip(),
               _buildVoltageChip(),
-              _buildScreenStateChip(),
               _buildElevatedStatusChip(),
             ],
           );
@@ -100,17 +99,6 @@ class MetricChips extends StatelessWidget {
       label: 'VOLTAGE',
       value: '$voltageMv mV ($volts V)',
       valueColor: AppTheme.textPrimary,
-    );
-  }
-
-  Widget _buildScreenStateChip() {
-    final color = isScreenOn ? AppTheme.chargingCyan : AppTheme.textMuted;
-    return _ChipContainer(
-      icon: isScreenOn ? Icons.screen_lock_portrait_rounded : Icons.phone_android_rounded,
-      iconColor: color,
-      label: 'DISPLAY',
-      value: isScreenOn ? 'SCREEN ON' : 'SCREEN OFF',
-      valueColor: isScreenOn ? AppTheme.chargingCyan : AppTheme.textSecondary,
     );
   }
 
