@@ -26,10 +26,6 @@ class AnomalyEngine {
     }
   }
 
-  DateTime? _lastAlertNotificationTime;
-  AnomalySeverity? _lastAlertSeverity;
-  static const Duration _nonCriticalAlertCooldown = Duration(minutes: 3);
-
   /// Evaluates an incoming sample for drain anomalies.
   /// Logs incidents to the Sentinel Log and decides whether to post a notification alert.
   AnomalyIncident? evaluateSample(TelemetrySample sample) {
@@ -84,34 +80,10 @@ class AnomalyEngine {
     return null;
   }
 
-  /// Evaluates whether an [AnomalyIncident] warrants buzzing the user's notification bar right now.
-  /// - CRITICAL (overheating, severe burn): ALWAYS alerts instantly (bypasses cooldown).
-  /// - MODERATE / MILD: Alerts immediately if severity escalated, or throttles to 3-min cooldown.
+  /// Evaluates whether an [AnomalyIncident] warrants buzzing the user's notification bar.
+  /// Strictly reserved for CRITICAL emergencies only (e.g. sustained high power drain + thermal elevation).
+  /// Routine moderate background activity is logged quietly in the Sentinel Log without interrupting the user.
   bool shouldAlertNotification(AnomalyIncident incident) {
-    final now = DateTime.now();
-
-    // Critical incidents always alert immediately
-    if (incident.severity == AnomalySeverity.critical) {
-      _lastAlertNotificationTime = now;
-      _lastAlertSeverity = incident.severity;
-      return true;
-    }
-
-    // If escalating from mild to moderate, alert immediately
-    if (_lastAlertSeverity == AnomalySeverity.mild && incident.severity == AnomalySeverity.moderate) {
-      _lastAlertNotificationTime = now;
-      _lastAlertSeverity = incident.severity;
-      return true;
-    }
-
-    // Check 3-minute cooldown for repeated non-critical alerts
-    if (_lastAlertNotificationTime == null ||
-        now.difference(_lastAlertNotificationTime!) >= _nonCriticalAlertCooldown) {
-      _lastAlertNotificationTime = now;
-      _lastAlertSeverity = incident.severity;
-      return true;
-    }
-
-    return false;
+    return incident.severity == AnomalySeverity.critical;
   }
 }

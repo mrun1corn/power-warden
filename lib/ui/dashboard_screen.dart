@@ -103,9 +103,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _checkElevatedWarning() async {
+    // Never show warning popup if user already has elevated access or permanent ADB granted!
+    if (_elevatedStatus['hasAnyElevatedAccess'] == true) return;
+
     final hasPrompted = await _telemetryService.getPrefBool('has_prompted_unpaired_warning', defaultValue: false);
-    if (!hasPrompted && _elevatedStatus['hasAnyElevatedAccess'] != true && mounted) {
-      // Delay slightly for smooth transition into view
+    if (!hasPrompted && mounted) {
       await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
       _showUnpairedWarningDialog();
@@ -452,7 +454,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final pkg = (proc['packageName'] as String?) ?? '';
                 final cpu = (proc['cpuPercent'] as num?)?.toDouble() ?? 0.0;
                 final ramMb = (proc['ramMb'] as num?)?.toInt() ?? 0;
-                final cpuTime = (proc['cpuTime'] as String?) ?? '';
                 final isHeavy = cpu > 10.0;
 
                 return ListTile(
@@ -470,37 +471,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   title: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          name.toUpperCase(),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (ramMb > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          margin: const EdgeInsets.only(left: 6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceVariant,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '${ramMb}MB RAM',
-                            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 9, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      if (cpuTime.isNotEmpty && cpuTime != '--:--')
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4.0),
-                          child: Text(
-                            cpuTime,
-                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 9),
-                          ),
-                        ),
-                    ],
-                  ),
+   children: [
+     Expanded(
+       child: Text(
+         name.toUpperCase(),
+         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+         overflow: TextOverflow.ellipsis,
+       ),
+     ),
+     if (ramMb > 0)
+       Container(
+         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+         margin: const EdgeInsets.only(left: 6),
+         decoration: BoxDecoration(
+           color: AppTheme.surfaceVariant,
+           borderRadius: BorderRadius.circular(4),
+         ),
+         child: Text(
+           '${ramMb}MB RAM',
+           style: const TextStyle(color: AppTheme.textSecondary, fontSize: 9, fontWeight: FontWeight.w600),
+         ),
+       ),
+     Container(
+       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+       margin: const EdgeInsets.only(left: 6),
+       decoration: BoxDecoration(
+         color: isHeavy ? AppTheme.crimson.withOpacity(0.15) : AppTheme.accentGreen.withOpacity(0.12),
+         borderRadius: BorderRadius.circular(4),
+       ),
+       child: Text(
+         isHeavy ? 'Heavy' : 'Calm',
+         style: TextStyle(
+           color: isHeavy ? AppTheme.crimson : AppTheme.accentGreen,
+           fontSize: 9,
+           fontWeight: FontWeight.bold,
+         ),
+       ),
+     ),
+   ],
+ ),
                   subtitle: Text(
                     pkg,
                     style: const TextStyle(color: AppTheme.textMuted, fontSize: 10),
