@@ -518,9 +518,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final isHeavy = cpu > 10.0;
                 final isCriticalCpu = cpu > 25.0;
 
-                // Live dynamic mA attribution based on instantaneous battery discharge
+                // AOSP Power Profile Model for realistic lower-bound app drain detection:
+                // Isolate display baseline (~240-280mA) and radio baseline (~40mA) so app mA is never falsely inflated.
                 final totalMa = (_currentSample?.currentMilliamps.abs() ?? 450);
-                final appEstimatedMa = math.max(2, (totalMa * (cpu / 100.0)).round());
+                final isScreenOn = _currentSample?.isScreenOn ?? true;
+                final screenBaseline = isScreenOn ? math.min(totalMa * 0.55, 260.0) : 0.0;
+                final radioBaseline = isScreenOn ? 40.0 : 15.0;
+                final processPool = math.max(25.0, totalMa - screenBaseline - radioBaseline);
+
+                final totalAppCpu = _topProcesses
+                    .fold<double>(0.0, (acc, p) => acc + ((p['cpuPercent'] as num?)?.toDouble() ?? 0.0))
+                    .clamp(1.0, 100.0);
+                final appEstimatedMa = math.max(2, (processPool * (cpu / totalAppCpu)).round());
 
                 final isDark = Theme.of(context).brightness == Brightness.dark;
                 final cardBg = isDark
