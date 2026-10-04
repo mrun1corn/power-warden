@@ -79,25 +79,28 @@ class DrainTimelineChart extends StatelessWidget {
                     color: textMuted,
                   ),
                 ),
-                  // Legend with Clear Labels
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppTheme.chargingCyan, shape: BoxShape.circle)),
-                      const SizedBox(width: 4),
-                      Text('Flow Rate (mA)', style: TextStyle(color: textMuted, fontSize: 10)),
-                    ],
-                  ),
+                // Legend with Clear Labels
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppTheme.chargingCyan, shape: BoxShape.circle)),
+                    const SizedBox(width: 4),
+                    Text('Flow Rate (mA)', style: TextStyle(color: textMuted, fontSize: 10)),
+                  ],
+                ),
               ],
             ),
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: LineChart(
-              LineChartData(
-                minY: chartMinY,
-                maxY: chartMaxY,
-                gridData: FlGridData(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: LineChart(
+                LineChartData(
+                  clipData: const FlClipData.all(), // Prevents line and gradient fill from bleeding outside the chart bounding box!
+                  minY: chartMinY,
+                  maxY: chartMaxY,
+                  gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
                   getDrawingHorizontalLine: (value) => FlLine(
@@ -168,6 +171,7 @@ class DrainTimelineChart extends StatelessWidget {
               ),
             ),
           ),
+        ),
         ],
       ),
     );

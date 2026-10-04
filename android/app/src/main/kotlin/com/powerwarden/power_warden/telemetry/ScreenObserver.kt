@@ -20,6 +20,8 @@ class ScreenObserver(
         private set
 
     private var screenOffTimestampMs: Long = if (!isScreenOn) SystemClock.elapsedRealtime() else 0L
+    var lastSleepDurationMs: Long = 0L
+        private set
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
@@ -29,6 +31,9 @@ class ScreenObserver(
                         SystemClock.elapsedRealtime() - screenOffTimestampMs
                     } else 0L
                     isScreenOn = true
+                    if (sleepDuration > 0L) {
+                        lastSleepDurationMs = sleepDuration
+                    }
                     screenOffTimestampMs = 0L
                     onStateChanged(true, sleepDuration)
                 }
@@ -60,13 +65,14 @@ class ScreenObserver(
     }
 
     /**
-     * If currently screen-off, returns how many ms the device has been in sleep mode.
+     * If currently screen-off, returns ongoing sleep ms.
+     * If screen is on, returns the duration of the sleep cycle that just ended.
      */
     fun getCurrentSleepDurationMs(): Long {
         return if (!isScreenOn && screenOffTimestampMs > 0L) {
             SystemClock.elapsedRealtime() - screenOffTimestampMs
         } else {
-            0L
+            lastSleepDurationMs
         }
     }
 }
