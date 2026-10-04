@@ -395,12 +395,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 12),
                   ],
 
-                  // Battery Guru Hero Card
-                  _buildBatteryGuruHeroCard(sample, surfaceColor, surfaceBorder, textColor, textMuted),
-                  const SizedBox(height: 12),
-
-                  // 3-Metric Clean Telemetry Ribbon (Current mA, Temp °C, Voltage V)
-                  _buildTelemetryRibbon(sample, surfaceColor, surfaceBorder, textColor, textMuted),
+                  // Unified Minimal Command Card (Battery Status + Instant Telemetry Strip)
+                  _buildUnifiedCommandCard(sample, surfaceColor, surfaceBorder, textColor, textMuted),
                   const SizedBox(height: 16),
 
                   // Discharge Timeline
@@ -756,7 +752,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildBatteryGuruHeroCard(
+  Widget _buildUnifiedCommandCard(
     TelemetrySample sample,
     Color surfaceColor,
     Color surfaceBorder,
@@ -768,7 +764,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final absMa = sample.currentMilliamps.abs();
     final hoursRemaining = isCharging ? 0.8 : (level * 0.22);
 
-    // Calculate real-time %/hr burn or charge rate (Standard 4500mAh battery reference)
     final percentPerHour = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
     final rateText = isCharging ? '+$percentPerHour%/hr' : '-$percentPerHour%/hr';
 
@@ -778,173 +773,160 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ? AppTheme.crimson
             : (absMa > 850 ? AppTheme.amber : AppTheme.accentGreen));
 
+    final volts = (sample.voltageMv / 1000.0).toStringAsFixed(2);
+    final watts = ((sample.voltageMv / 1000.0) * (absMa / 1000.0)).toStringAsFixed(1);
+    final currentLabel = isCharging ? '+$absMa mA' : '-$absMa mA';
+
     return Container(
-      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: surfaceBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          '$level%',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 52,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1.5,
-                            height: 1.0,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            rateText,
+          // Upper Level: Battery % + Burn Velocity + Health Row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            '$level%',
                             style: TextStyle(
-                              color: statusColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                              fontSize: 50,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -1.5,
+                              height: 1.0,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(
-                          isCharging ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
-                          size: 16,
-                          color: statusColor,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isCharging
-                              ? 'Fast Charging · Full in ~${(hoursRemaining * 60).round()}m'
-                              : 'Battery Healthy · ~${hoursRemaining.toStringAsFixed(1)}h remaining',
-                          style: TextStyle(
-                            color: textMuted,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              rateText,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (_elevatedStatus['hasAnyElevatedAccess'] != true)
-                InkWell(
-                  onTap: _showPairingModal,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.amber.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.amber.withValues(alpha: 0.3)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.link_rounded, size: 14, color: AppTheme.amber),
-                        SizedBox(width: 5),
-                        Text(
-                          'SET UP ACCESS',
-                          style: TextStyle(
-                            color: AppTheme.amber,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            isCharging ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
+                            size: 15,
+                            color: statusColor,
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(width: 5),
+                          Text(
+                            isCharging
+                                ? 'Fast Charging · Full in ~${(hoursRemaining * 60).round()}m'
+                                : 'Battery Healthy · ~${hoursRemaining.toStringAsFixed(1)}h left',
+                            style: TextStyle(
+                              color: textMuted,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-            ],
+                if (_elevatedStatus['hasAnyElevatedAccess'] != true)
+                  InkWell(
+                    onTap: _showPairingModal,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.amber.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.amber.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.link_rounded, size: 14, color: AppTheme.amber),
+                          SizedBox(width: 4),
+                          Text(
+                            'SET UP',
+                            style: TextStyle(
+                              color: AppTheme.amber,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Divider between Hero and Telemetry Strip
+          Divider(height: 1, color: surfaceBorder),
+
+          // Lower Level: Integrated Telemetry Strip (CURRENT, POWER, TEMP, VOLTS)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildRibbonItem(
+                  icon: Icons.speed_rounded,
+                  color: isCharging ? AppTheme.chargingCyan : statusColor,
+                  label: isCharging ? 'CHARGE' : 'CURRENT',
+                  value: currentLabel,
+                ),
+                Container(width: 1, height: 26, color: surfaceBorder),
+                _buildRibbonItem(
+                  icon: Icons.bolt_rounded,
+                  color: isCharging ? AppTheme.chargingCyan : AppTheme.amber,
+                  label: 'POWER',
+                  value: '${watts}W',
+                ),
+                Container(width: 1, height: 26, color: surfaceBorder),
+                _buildRibbonItem(
+                  icon: Icons.thermostat_rounded,
+                  color: sample.temperatureCelsius >= 38.0 ? AppTheme.amber : AppTheme.accentGreen,
+                  label: 'TEMP',
+                  value: '${sample.temperatureCelsius.toStringAsFixed(1)}°C',
+                ),
+                Container(width: 1, height: 26, color: surfaceBorder),
+                _buildRibbonItem(
+                  icon: Icons.battery_charging_full_rounded,
+                  color: textMuted,
+                  label: 'VOLTS',
+                  value: '${volts}V',
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildTelemetryRibbon(
-    TelemetrySample sample,
-    Color surfaceColor,
-    Color surfaceBorder,
-    Color textColor,
-    Color textMuted,
-  ) {
-    final absMa = sample.currentMilliamps.abs();
-    final isCharging = sample.isCharging;
-    final volts = (sample.voltageMv / 1000.0).toStringAsFixed(2);
-    final watts = ((sample.voltageMv / 1000.0) * (absMa / 1000.0)).toStringAsFixed(1);
-
-    final currentLabel = isCharging ? '+$absMa mA' : '-$absMa mA';
-    final currentColor = isCharging
-        ? AppTheme.chargingCyan
-        : (absMa > 1200 ? AppTheme.crimson : (absMa > 850 ? AppTheme.amber : AppTheme.chargingCyan));
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: surfaceBorder),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildRibbonItem(
-            icon: Icons.speed_rounded,
-            color: currentColor,
-            label: isCharging ? 'CHARGE' : 'CURRENT',
-            value: currentLabel,
-          ),
-          Container(width: 1, height: 32, color: surfaceBorder),
-          _buildRibbonItem(
-            icon: Icons.bolt_rounded,
-            color: isCharging ? AppTheme.chargingCyan : AppTheme.amber,
-            label: 'POWER',
-            value: '${watts}W',
-          ),
-          Container(width: 1, height: 32, color: surfaceBorder),
-          _buildRibbonItem(
-            icon: Icons.thermostat_rounded,
-            color: sample.temperatureCelsius >= 38.0 ? AppTheme.amber : AppTheme.accentGreen,
-            label: 'TEMP',
-            value: '${sample.temperatureCelsius.toStringAsFixed(1)}°C',
-          ),
-          Container(width: 1, height: 32, color: surfaceBorder),
-          _buildRibbonItem(
-            icon: Icons.battery_charging_full_rounded,
-            color: textMuted,
-            label: 'VOLTS',
-            value: '${volts}V',
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildRibbonItem({
     required IconData icon,
     required Color color,

@@ -3,6 +3,7 @@ package com.powerwarden.power_warden.privileged
 import android.app.ActivityManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
@@ -283,12 +284,7 @@ class PrivilegedExecutor(private val context: Context) {
                             }
 
                             // Query Android PackageManager for the real localized human app label
-                            val appLabel = try {
-                                val appInfo = packageManager.getApplicationInfo(cleanPkg, 0)
-                                packageManager.getApplicationLabel(appInfo).toString()
-                            } catch (_: Exception) {
-                                cleanPkg.substringAfterLast(".").replace("_", " ").capitalizeWords()
-                            }
+                            val appLabel = resolveAppLabel(cleanPkg)
 
                             list.add(
                                 mapOf(
@@ -324,12 +320,7 @@ class PrivilegedExecutor(private val context: Context) {
                     val pkgName = stat.packageName
                     if (!seen.contains(pkgName)) {
                         seen.add(pkgName)
-                        val appLabel = try {
-                            val appInfo = packageManager.getApplicationInfo(pkgName, 0)
-                            packageManager.getApplicationLabel(appInfo).toString()
-                        } catch (_: Exception) {
-                            pkgName.substringAfterLast(".").capitalizeWords()
-                        }
+                        val appLabel = resolveAppLabel(pkgName)
 
                         // Compute realistic dynamic CPU impact proportional to active foreground engagement
                         val fgSeconds = (stat.totalTimeInForeground / 1000).coerceAtLeast(1)
@@ -460,12 +451,7 @@ class PrivilegedExecutor(private val context: Context) {
                 val fgMs = entry.value
                 val fgMinutes = (fgMs / (1000 * 60)).toInt()
 
-                val appLabel = try {
-                    val appInfo = packageManager.getApplicationInfo(pkgName, 0)
-                    packageManager.getApplicationLabel(appInfo).toString()
-                } catch (_: Exception) {
-                    pkgName.substringAfterLast(".").capitalizeWords()
-                }
+                val appLabel = resolveAppLabel(pkgName)
 
                 val usageSharePercent = Math.round((fgMs.toDouble() / totalForegroundAll) * 1000.0) / 10.0
                 val estimatedMah = Math.round((fgMinutes / 60.0) * 450.0).toInt()
@@ -525,6 +511,47 @@ class PrivilegedExecutor(private val context: Context) {
 
     private fun String.capitalizeWords(): String {
         return split(" ").joinToString(" ") { it.replaceFirstChar { char -> char.uppercase() } }
+    }
+
+    private fun resolveAppLabel(packageName: String): String {
+        return try {
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                PackageManager.MATCH_UNINSTALLED_PACKAGES
+            } else {
+                PackageManager.GET_UNINSTALLED_PACKAGES
+            }
+            val appInfo = packageManager.getApplicationInfo(packageName, flags)
+            val label = packageManager.getApplicationLabel(appInfo).toString()
+            if (label.isNotBlank() && !label.contains(".")) {
+                label
+            } else {
+                // Secondary lookup via launch intent
+                val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                val resolved = launchIntent?.resolveActivity(packageManager)
+                if (resolved != null) {
+                    val actInfo = packageManager.getActivityInfo(resolved, 0)
+                    actInfo.loadLabel(packageManager).toString()
+                } else {
+                    formatPackageFallback(packageName)
+                }
+            }
+        } catch (_: Exception) {
+            formatPackageFallback(packageName)
+        }
+    }
+
+    private fun formatPackageFallback(pkg: String): String {
+        val last = pkg.substringAfterLast(".")
+        return when {
+            pkg.contains("vending") -> "Google Play Store"
+            pkg.contains("gms") -> "Google Play Services"
+            pkg.contains("settings") -> "Settings"
+            pkg.contains("launcher") -> "System Launcher"
+            pkg.contains("camera") -> "Camera"
+            pkg.contains("chrome") -> "Chrome"
+            pkg.contains("systemui") -> "System UI"
+            else -> last.replace("_", " ").replace("-", " ").capitalizeWords()
+        }
     }
 
     /**
