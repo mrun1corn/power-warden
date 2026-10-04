@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 import '../domain/models/anomaly_incident.dart';
 
 /// Notification Service for issuing alert notifications on runaway battery drain.
@@ -7,18 +8,25 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notificationsPlugin =
+      FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
+  static const int _alertNotificationId = 1001;
+  static const Duration _cooldownDuration = Duration(minutes: 15);
+  static const int _maxAlertsPerHour = 3;
+
+  DateTime? _lastAlertTime;
+  final List<DateTime> _recentAlertTimestamps = [];
   Future<void> initialize() async {
     if (_initialized) return;
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const initSettings = InitializationSettings(android: androidSettings);
 
-    await _notificationsPlugin.initialize(
-      settings: initSettings,
-    );
+    await _notificationsPlugin.initialize(settings: initSettings);
     _initialized = true;
   }
 
@@ -27,6 +35,27 @@ class NotificationService {
     String? topAppName,
     double? topAppCpu,
   }) async {
+    final now = DateTime.now();
+
+    // Purge timestamps older than 1 hour
+    _recentAlertTimestamps.removeWhere(
+      (t) => now.difference(t) > const Duration(hours: 1),
+    );
+
+    // Strict cooldown check: at least 15 minutes between alerts
+    if (_lastAlertTime != null &&
+        now.difference(_lastAlertTime!) < _cooldownDuration) {
+      return;
+    }
+
+    // Hard cap: maximum 3 alerts per hour
+    if (_recentAlertTimestamps.length >= _maxAlertsPerHour) {
+      return;
+    }
+
+    _lastAlertTime = now;
+    _recentAlertTimestamps.add(now);
+
     const androidDetails = AndroidNotificationDetails(
       'power_warden_alerts',
       'PowerWarden Alerts',
@@ -34,24 +63,30 @@ class NotificationService {
       importance: Importance.high,
       priority: Priority.high,
       showWhen: true,
+      onlyAlertOnce: true,
     );
     const notificationDetails = NotificationDetails(android: androidDetails);
 
-    final title = '⚡ Critical Battery Drain (${incident.peakCurrentMa} mA)';
+    final title = 'Critical Battery Drain (${incident.peakCurrentMa} mA)';
     final String body;
 
     final culprit = incident.culpritPackage ?? incident.culpritThread;
-    if (culprit != null && culprit.isNotEmpty && !culprit.contains('Stuck CPU')) {
+    if (culprit != null &&
+        culprit.isNotEmpty &&
+        !culprit.contains('Stuck CPU')) {
       body = 'Rogue app: $culprit · Burning power in background.';
     } else if (topAppName != null && topAppName.isNotEmpty) {
-      final cpuStr = topAppCpu != null && topAppCpu > 0 ? ' (${topAppCpu.toStringAsFixed(1)}% CPU)' : '';
+      final cpuStr = topAppCpu != null && topAppCpu > 0
+          ? ' (${topAppCpu.toStringAsFixed(1)}% CPU)'
+          : '';
       body = 'Top Consumer: $topAppName$cpuStr · High power burn.';
     } else {
-      body = '${incident.peakCurrentMa} mA sustained draw with thermal elevation.';
+      body =
+          '${incident.peakCurrentMa} mA sustained draw with thermal elevation.';
     }
 
     await _notificationsPlugin.show(
-      id: incident.hashCode,
+      id: _alertNotificationId,
       title: title,
       body: body,
       notificationDetails: notificationDetails,

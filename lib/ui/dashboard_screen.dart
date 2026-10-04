@@ -483,7 +483,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     textColor,
                     textMuted,
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(
+                    height: MediaQuery.viewPaddingOf(context).bottom + 24,
+                  ),
                 ],
               ),
             ),
@@ -619,12 +621,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           )
         else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _topProcesses.length,
-            itemBuilder: (context, idx) {
-              final proc = _topProcesses[idx];
+          Column(
+            children: _topProcesses.map((proc) {
               final name = (proc['name'] as String?) ?? 'App';
               final pkg = (proc['packageName'] as String?) ?? '';
               final cpu = (proc['cpuPercent'] as num?)?.toDouble() ?? 0.0;
@@ -799,69 +797,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(width: 6),
 
-                            // Force Stop Action Button
-                            InkWell(
-                              onTap: () async {
-                                final messenger = ScaffoldMessenger.of(context);
-                                final ok = await _telemetryService.remediateApp(
-                                  pkg,
-                                );
-                                if (!mounted) return;
-                                if (ok) {
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text('✓ Force-stopped $name'),
-                                      duration: const Duration(seconds: 2),
-                                    ),
+                            // Force Stop Action Button (48dp interactive touch target)
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () async {
+                                  final messenger = ScaffoldMessenger.of(
+                                    context,
                                   );
-                                  _loadProcesses();
-                                } else {
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Please tap "Force Stop" in $name system settings',
+                                  final ok = await _telemetryService
+                                      .remediateApp(pkg);
+                                  if (!mounted) return;
+                                  if (ok) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text('✓ Force-stopped $name'),
+                                        duration: const Duration(seconds: 2),
                                       ),
-                                      duration: const Duration(seconds: 3),
-                                    ),
-                                  );
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                height: 26,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 9,
-                                ),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: isHeavy
-                                      ? AppTheme.crimson.withValues(alpha: 0.15)
-                                      : (isDark
-                                            ? AppTheme.surfaceVariantDark
-                                            : AppTheme.surfaceVariantLight),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: isHeavy
-                                        ? AppTheme.crimson.withValues(
-                                            alpha: 0.4,
-                                          )
-                                        : (isDark
-                                              ? AppTheme.surfaceBorderDark
-                                              : AppTheme.surfaceBorderLight),
-                                    width: 1,
+                                    );
+                                    _loadProcesses();
+                                  } else {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Please tap "Force Stop" in $name system settings',
+                                        ),
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    minHeight: 48,
+                                    minWidth: 54,
                                   ),
-                                ),
-                                child: Text(
-                                  'STOP',
-                                  style: TextStyle(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
                                     color: isHeavy
-                                        ? AppTheme.crimson
+                                        ? (isDark
+                                              ? AppTheme.crimson.withValues(
+                                                  alpha: 0.15,
+                                                )
+                                              : AppTheme.crimsonLight
+                                                    .withValues(alpha: 0.12))
                                         : (isDark
-                                              ? AppTheme.textSecondary
-                                              : AppTheme.textSecondaryLight),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
+                                              ? AppTheme.surfaceVariantDark
+                                              : AppTheme.surfaceVariantLight),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isHeavy
+                                          ? (isDark
+                                                    ? AppTheme.crimson
+                                                    : AppTheme.crimsonLight)
+                                                .withValues(alpha: 0.4)
+                                          : (isDark
+                                                ? AppTheme.surfaceBorderDark
+                                                : AppTheme.surfaceBorderLight),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'STOP',
+                                    style: TextStyle(
+                                      color: isHeavy
+                                          ? (isDark
+                                                ? AppTheme.crimson
+                                                : AppTheme.crimsonLight)
+                                          : (isDark
+                                                ? AppTheme.textSecondary
+                                                : AppTheme.textSecondaryLight),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -934,7 +948,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               );
-            },
+            }).toList(),
           ),
       ],
     );
@@ -948,26 +962,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Color textMuted,
   ) {
     final isCharging = sample.isCharging;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final level = sample.batteryLevel;
     final absMa = sample.currentMilliamps.abs();
     final hoursRemaining = isCharging ? 0.8 : (level * 0.22);
 
-    final percentPerHour = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
-    final rateText = isCharging
-        ? '+$percentPerHour%/hr'
-        : '-$percentPerHour%/hr';
-
-    final statusColor = isCharging
-        ? AppTheme.chargingCyan
-        : (absMa > 1200
-              ? AppTheme.crimson
-              : (absMa > 850 ? AppTheme.amber : AppTheme.accentGreen));
+    final Color statusColor;
+    final String statusBadge;
+    if (isCharging) {
+      statusColor = isDark ? AppTheme.chargingCyan : AppTheme.chargingCyanLight;
+      statusBadge = 'CHARGING';
+    } else if (absMa > 1200) {
+      statusColor = isDark ? AppTheme.crimson : AppTheme.crimsonLight;
+      statusBadge = 'CRITICAL DRAIN';
+    } else if (absMa > 850) {
+      statusColor = isDark ? AppTheme.amber : AppTheme.amberLight;
+      statusBadge = 'HEAVY LOAD';
+    } else if (absMa > 300) {
+      statusColor = isDark ? AppTheme.amber : AppTheme.amberLight;
+      statusBadge = 'ACTIVE USE';
+    } else {
+      statusColor = isDark ? AppTheme.accentGreen : AppTheme.accentGreenLight;
+      statusBadge = 'RESTING IDLE';
+    }
 
     final volts = (sample.voltageMv / 1000.0).toStringAsFixed(2);
     final watts = ((sample.voltageMv / 1000.0) * (absMa / 1000.0))
         .toStringAsFixed(1);
     final currentLabel = isCharging ? '+$absMa mA' : '-$absMa mA';
-
     return Container(
       decoration: BoxDecoration(
         color: surfaceColor,
@@ -988,34 +1010,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
                         children: [
                           Text(
                             '$level%',
                             style: TextStyle(
                               color: textColor,
-                              fontSize: 50,
+                              fontSize: 48,
                               fontWeight: FontWeight.w900,
                               letterSpacing: -1.5,
                               height: 1.0,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
+                          Text(
+                            currentLabel,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
+                              horizontal: 8,
+                              vertical: 3,
                             ),
                             decoration: BoxDecoration(
                               color: statusColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: statusColor.withValues(alpha: 0.3),
+                                width: 1,
+                              ),
                             ),
                             child: Text(
-                              rateText,
+                              statusBadge,
                               style: TextStyle(
                                 color: statusColor,
-                                fontSize: 12,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ),

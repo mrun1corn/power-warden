@@ -41,7 +41,7 @@ class PairingNotificationHelper(private val context: Context) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Wireless Debugging Helper",
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Enter pairing code directly from the notification"
                 setShowBadge(false)
@@ -76,9 +76,9 @@ class PairingNotificationHelper(private val context: Context) {
             .setContentTitle("Wireless ADB Pairing Helper")
             .setContentText("$portShort · Tap to enter pairing code")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setOnlyAlertOnce(true)
+            .setOngoing(false)
             .setContentIntent(openSettingsPending)
             .addAction(android.R.drawable.ic_menu_preferences, "Open Settings", openSettingsPending)
             .build()
