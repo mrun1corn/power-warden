@@ -58,10 +58,10 @@ class AppDatabase {
     _pruneTimer = null;
   }
 
-  /// Appends sample to in-memory buffer. Flushes if buffer reaches capacity (30 samples).
+  /// Appends sample to in-memory buffer. Flushes if buffer reaches capacity (5 samples).
   Future<void> bufferSample(TelemetrySample sample) async {
     _memoryBuffer.add(sample);
-    if (_memoryBuffer.length >= maxBufferSize) {
+    if (_memoryBuffer.length >= 5) {
       await flushBuffer();
     }
   }

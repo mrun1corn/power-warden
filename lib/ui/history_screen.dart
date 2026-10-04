@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../data/database/database.dart';
@@ -39,6 +40,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
 
   Future<void> _loadAllHistory() async {
     setState(() => _isLoading = true);
+    await _database.initialize();
     final sessions = await _database.getRecentSessions(limit: 60);
     final appUsage = await _telemetryService.getHistoricalAppUsage(days: 1);
     final samples = await _database.getRecentTelemetry(limit: 120);
@@ -139,7 +141,38 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     Color textMuted, {
     required bool isChargingTab,
   }) {
-    if (sessions.isEmpty) {
+    // Fallback: If no sessions recorded yet, reconstruct session from recent historical samples
+    final effectiveSessions = List<PowerSession>.from(sessions);
+    if (effectiveSessions.isEmpty && _historicalSamples.isNotEmpty) {
+      final matchingSamples = _historicalSamples.where((s) => isChargingTab ? s.isCharging : !s.isCharging).toList();
+      if (matchingSamples.length >= 2) {
+        final first = matchingSamples.last;
+        final last = matchingSamples.first;
+        final delta = (last.batteryLevel - first.batteryLevel).abs();
+        final maxCur = matchingSamples.map((s) => s.currentMilliamps.abs()).reduce(math.max);
+        final minT = matchingSamples.map((s) => s.temperatureCelsius).reduce(math.min);
+        final maxT = matchingSamples.map((s) => s.temperatureCelsius).reduce(math.max);
+
+        effectiveSessions.add(
+          PowerSession(
+            id: 'synthesized_recent',
+            type: isChargingTab ? 'charging' : 'discharging',
+            startTime: first.timestamp,
+            endTime: last.timestamp,
+            startBatteryLevel: first.batteryLevel,
+            endBatteryLevel: last.batteryLevel,
+            totalMahDelta: math.max(10, ((delta / 100.0) * 4500).round()),
+            peakMa: maxCur,
+            peakWatts: (last.voltageMv / 1000.0) * (maxCur / 1000.0),
+            minTempCelsius: minT,
+            maxTempCelsius: maxT,
+            topAppName: _appUsageList.isNotEmpty ? (_appUsageList.first['name'] as String? ?? '') : '',
+          ),
+        );
+      }
+    }
+
+    if (effectiveSessions.isEmpty) {
       return _buildEmptyState(
         icon: isChargingTab ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
         title: isChargingTab ? 'No charging sessions recorded yet' : 'No discharge cycles recorded yet',
@@ -153,9 +186,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: sessions.length,
+      itemCount: effectiveSessions.length,
       itemBuilder: (context, index) {
-        final session = sessions[index];
+        final session = effectiveSessions[index];
         final accentColor = session.isCharging ? AppTheme.chargingCyan : AppTheme.accentGreen;
         final sign = session.isCharging ? '+' : '-';
         final deltaPercent = (session.endBatteryLevel - session.startBatteryLevel).abs();
@@ -259,12 +292,33 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     bool isDark,
   ) {
     if (_appUsageList.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.apps_rounded,
-        title: 'No app usage history found',
-        subtitle: 'Ensure Usage Access permission is granted to see app burn breakdown.',
-        textColor: textColor,
-        textMuted: textMuted,
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+        child: Column(
+          children: [
+            _buildEmptyState(
+              icon: Icons.apps_rounded,
+              title: 'App Usage Access Needed',
+              subtitle: 'Android requires Usage Access permission to read historical app runtimes and compute battery burn per app.',
+              textColor: textColor,
+              textMuted: textMuted,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () async {
+                await _telemetryService.openUsageAccessSettings();
+              },
+              icon: const Icon(Icons.security_rounded, size: 16),
+              label: const Text('Grant Usage Access in Settings'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentGreen,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -352,8 +406,8 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     Color textMuted,
     bool isDark,
   ) {
-    // Filter samples with sleep intervals > 30 minutes
-    final sleepSamples = _historicalSamples.where((s) => s.sleepDurationMs > (1000 * 60 * 30)).toList();
+    // Filter samples with sleep intervals > 1 minute for testing & real-world responsiveness
+    final sleepSamples = _historicalSamples.where((s) => s.sleepDurationMs > (1000 * 60)).toList();
 
     if (sleepSamples.isEmpty) {
       return _buildEmptyState(

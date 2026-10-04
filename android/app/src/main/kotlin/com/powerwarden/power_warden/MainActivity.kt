@@ -220,6 +220,17 @@ class MainActivity : FlutterActivity() {
                         result.success(history)
                     }
                 }
+                "openUsageAccessSettings" -> {
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (_: Exception) {
+                        result.success(false)
+                    }
+                }
                 "runDeltaDiagnostics" -> {
                     activityScope.launch {
                         val diag = privilegedExecutor.runDifferentialDiagnostics()

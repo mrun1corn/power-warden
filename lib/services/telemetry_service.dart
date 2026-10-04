@@ -176,6 +176,16 @@ class TelemetryService {
     return [];
   }
 
+  /// Opens Android Usage Access Settings screen.
+  Future<bool> openUsageAccessSettings() async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('openUsageAccessSettings');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Remediates a rogue application via elevated ADB.
   Future<bool> remediateApp(String packageName, {String action = 'force_stop'}) async {
     try {
