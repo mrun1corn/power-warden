@@ -1,7 +1,10 @@
 package com.powerwarden.power_warden
 
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
 import androidx.annotation.NonNull
 import com.powerwarden.power_warden.privileged.PrivilegedExecutor
 import com.powerwarden.power_warden.service.PowerWardenService
@@ -220,16 +223,49 @@ class MainActivity : FlutterActivity() {
                         result.success(history)
                     }
                 }
-                "openUsageAccessSettings" -> {
+                "requestIgnoreBatteryOptimizations" -> {
                     try {
-                        val intent = Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                        val isIgnoring = powerManager.isIgnoringBatteryOptimizations(packageName)
+                        if (!isIgnoring) {
+                            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = android.net.Uri.parse("package:$packageName")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(intent)
                         }
-                        startActivity(intent)
+
+                        // Also attempt OEM AutoStart intents (Xiaomi HyperOS/MIUI, Huawei, Oppo, Vivo)
+                        val oemIntents = listOf(
+                            // Xiaomi HyperOS & MIUI AutoStart & App Battery Saver
+                            Intent().setComponent(android.content.ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
+                            Intent().setComponent(android.content.ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity")),
+                            // Huawei / Honor
+                            Intent().setComponent(android.content.ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity")),
+                            // Oppo / Realme
+                            Intent().setComponent(android.content.ComponentName("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity")),
+                            // Vivo / iQOO
+                            Intent().setComponent(android.content.ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"))
+                        )
+
+                        for (oemIntent in oemIntents) {
+                            try {
+                                oemIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                if (packageManager.resolveActivity(oemIntent, PackageManager.MATCH_DEFAULT_ONLY) != null) {
+                                    startActivity(oemIntent)
+                                    break
+                                }
+                            } catch (_: Exception) {}
+                        }
+
                         result.success(true)
                     } catch (_: Exception) {
                         result.success(false)
                     }
+                }
+                "isBatteryOptimizationIgnored" -> {
+                    val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    result.success(powerManager.isIgnoringBatteryOptimizations(packageName))
                 }
                 "runDeltaDiagnostics" -> {
                     activityScope.launch {

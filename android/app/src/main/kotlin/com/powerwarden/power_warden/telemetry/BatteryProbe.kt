@@ -44,7 +44,8 @@ class BatteryProbe(private val context: Context) {
     }
 
     /**
-     * Reads a single instantaneous snapshot from BatteryManager and sticky ACTION_BATTERY_CHANGED intent.
+     * Reads a single instantaneous snapshot from BatteryManager, sticky ACTION_BATTERY_CHANGED intent,
+     * and direct Linux sysfs power supply nodes as OEM fallback (HyperOS/MIUI/Samsung).
      */
     fun readInstantaneousSample(): BatterySnapshot {
         val stickyIntent = context.registerReceiver(
@@ -52,8 +53,11 @@ class BatteryProbe(private val context: Context) {
             IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         )
 
-        // Read raw CURRENT_NOW (Long)
-        val rawCurrent = batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+        // Read raw CURRENT_NOW (Long) with direct kernel sysfs fallback
+        var rawCurrent = batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+        if (rawCurrent == 0L || rawCurrent == Long.MIN_VALUE || rawCurrent == Long.MAX_VALUE) {
+            rawCurrent = readSysfsBatteryCurrent()
+        }
 
         // Status & Charging state
         val status = stickyIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
@@ -85,6 +89,33 @@ class BatteryProbe(private val context: Context) {
             batteryLevel = level,
             isCharging = isCharging
         )
+    }
+
+    /**
+     * Direct Linux Kernel sysfs nodes for Xiaomi/HyperOS/Redmi/Samsung/OnePlus.
+     * Bypasses OEM framework sleeping layers.
+     */
+    private fun readSysfsBatteryCurrent(): Long {
+        val paths = listOf(
+            "/sys/class/power_supply/battery/current_now",
+            "/sys/class/power_supply/bms/current_now",
+            "/sys/class/power_supply/battery/batt_current",
+            "/sys/class/power_supply/battery/current_avg",
+            "/sys/class/power_supply/qcom-battery/current_now"
+        )
+        for (path in paths) {
+            try {
+                val file = java.io.File(path)
+                if (file.exists() && file.canRead()) {
+                    val line = file.readText().trim()
+                    val value = line.toLongOrNull()
+                    if (value != null && value != 0L) {
+                        return value
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        return 0L
     }
 
     /**

@@ -88,6 +88,24 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           ],
         ),
         actions: [
+          // OEM Battery Optimization Exemption Action
+          IconButton(
+            icon: const Icon(Icons.battery_charging_full_rounded, size: 20),
+            tooltip: 'Disable Battery Optimization (Don\'t Kill My App)',
+            onPressed: () async {
+              final ok = await _telemetryService.requestIgnoreBatteryOptimizations();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? 'Prompted battery optimization & OEM background autostart'
+                        : 'Battery optimization settings could not be opened'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadAllHistory,
@@ -306,10 +324,10 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () async {
-                await _telemetryService.openUsageAccessSettings();
+                await _telemetryService.requestIgnoreBatteryOptimizations();
               },
               icon: const Icon(Icons.security_rounded, size: 16),
-              label: const Text('Grant Usage Access in Settings'),
+              label: const Text('Allow Background Running & AutoStart'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentGreen,
                 foregroundColor: Colors.black,

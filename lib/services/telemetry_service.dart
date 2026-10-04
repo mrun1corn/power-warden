@@ -176,10 +176,20 @@ class TelemetryService {
     return [];
   }
 
-  /// Opens Android Usage Access Settings screen.
-  Future<bool> openUsageAccessSettings() async {
+  /// Requests exemption from Android & OEM battery optimizations (HyperOS/MIUI/Samsung).
+  Future<bool> requestIgnoreBatteryOptimizations() async {
     try {
-      final res = await _methodChannel.invokeMethod<bool>('openUsageAccessSettings');
+      final res = await _methodChannel.invokeMethod<bool>('requestIgnoreBatteryOptimizations');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Checks if PowerWarden is exempt from battery saver / sleeping restrictions.
+  Future<bool> isBatteryOptimizationIgnored() async {
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('isBatteryOptimizationIgnored');
       return res ?? false;
     } catch (_) {
       return false;
