@@ -98,8 +98,7 @@ class PrivilegedExecutor(private val context: Context) {
                             kadbInstance.shell("pm grant $pkg android.permission.BATTERY_STATS")
                             kadbInstance.shell("pm grant $pkg android.permission.PACKAGE_USAGE_STATS")
                             kadbInstance.shell("pm grant $pkg android.permission.DUMP")
-                            kadbInstance.shell("pm grant $pkg android.permission.WRITE_SECURE_SETTINGS")
-                        } catch (_: Exception) {}
+                            } catch (_: Exception) {}
                     }
                 } catch (_: Exception) {}
             }
@@ -131,7 +130,6 @@ class PrivilegedExecutor(private val context: Context) {
                     candidate.shell("pm grant $pkg android.permission.BATTERY_STATS")
                     candidate.shell("pm grant $pkg android.permission.PACKAGE_USAGE_STATS")
                     candidate.shell("pm grant $pkg android.permission.DUMP")
-                    candidate.shell("pm grant $pkg android.permission.WRITE_SECURE_SETTINGS")
                 } catch (_: Exception) {}
             }
             ok
