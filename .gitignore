@@ -28,7 +28,9 @@ migrate_working_dir/
 .packages
 .pub-cache/
 .pub/
-/build/
+build/
+**/android/build/
+**/android/app/build/
 
 # Android related
 **/android/**/gradle-wrapper.jar
@@ -41,3 +43,13 @@ migrate_working_dir/
 .externalNativeBuild
 .cxx
 local.properties
+
+# Tooling & Agent Caches
+.repowise/
+graphify-out/
+
+# Gradle distributions and binaries accidentally placed in android
+android/gradle-[0-9]*/
+android/bin/
+android/lib/
+android/init.d/
