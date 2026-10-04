@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../services/telemetry_service.dart';
 import 'theme.dart';
 import 'widgets/wireless_pairing_sheet.dart';
@@ -9,10 +10,7 @@ import 'widgets/wireless_pairing_sheet.dart';
 class SetupScreen extends StatefulWidget {
   final VoidCallback onSetupComplete;
 
-  const SetupScreen({
-    super.key,
-    required this.onSetupComplete,
-  });
+  const SetupScreen({super.key, required this.onSetupComplete});
 
   @override
   State<SetupScreen> createState() => _SetupScreenState();
@@ -36,7 +34,8 @@ class _SetupScreenState extends State<SetupScreen> {
       setState(() {
         _elevatedStatus = status;
         // Strictly verify active live elevated connection (Active Kadb socket or Shizuku permission)
-        _isPaired = status['hasKadb'] == true || status['hasShizukuPermission'] == true;
+        _isPaired =
+            status['hasKadb'] == true || status['hasShizukuPermission'] == true;
       });
     }
   }
@@ -90,7 +89,10 @@ class _SetupScreenState extends State<SetupScreen> {
                   if (_currentStep < 2)
                     TextButton(
                       onPressed: _finishSetup,
-                      child: const Text('Skip', style: TextStyle(color: AppTheme.textMuted)),
+                      child: const Text(
+                        'Skip',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      ),
                     ),
                 ],
               ),
@@ -101,46 +103,56 @@ class _SetupScreenState extends State<SetupScreen> {
                   0 => _buildWelcomeStep(),
                   1 => _buildTelemetryIntroStep(),
                   _ => _buildElevationStep(),
-   },
- ),
+                },
+              ),
 
- // Bottom Navigation Controls
- Row(
-   children: [
-     if (_currentStep > 0)
-       OutlinedButton(
-         onPressed: () => setState(() => _currentStep--),
-         style: OutlinedButton.styleFrom(
-           foregroundColor: Colors.white,
-           side: const BorderSide(color: AppTheme.surfaceBorder),
-           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-         ),
-         child: const Text('Back'),
-       ),
-     const Spacer(),
-     ElevatedButton(
-       onPressed: () {
-         if (_currentStep < 2) {
-           setState(() => _currentStep++);
-         } else {
-           _finishSetup();
-         }
-       },
-       style: ElevatedButton.styleFrom(
-         backgroundColor: AppTheme.accentGreen,
-         foregroundColor: Colors.black,
-         elevation: 0,
-         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-       ),
-       child: Text(
-         _currentStep == 2 ? 'Get Started' : 'Next',
-         style: const TextStyle(fontWeight: FontWeight.bold),
-       ),
-     ),
-   ],
- ),
+              // Bottom Navigation Controls
+              Row(
+                children: [
+                  if (_currentStep > 0)
+                    OutlinedButton(
+                      onPressed: () => setState(() => _currentStep--),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: AppTheme.surfaceBorder),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                      ),
+                      child: const Text('Back'),
+                    ),
+                  const Spacer(),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (_currentStep < 2) {
+                        setState(() => _currentStep++);
+                      } else {
+                        _finishSetup();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.accentGreen,
+                      foregroundColor: Colors.black,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 28,
+                        vertical: 14,
+                      ),
+                    ),
+                    child: Text(
+                      _currentStep == 2 ? 'Get Started' : 'Next',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -158,7 +170,9 @@ class _SetupScreenState extends State<SetupScreen> {
       decoration: BoxDecoration(
         color: active
             ? AppTheme.accentGreen
-            : (done ? AppTheme.accentGreen.withOpacity(0.4) : AppTheme.surfaceVariant),
+            : (done
+                  ? AppTheme.accentGreen.withValues(alpha: 0.4)
+                  : AppTheme.surfaceVariant),
         borderRadius: BorderRadius.circular(3),
       ),
     );
@@ -171,10 +185,14 @@ class _SetupScreenState extends State<SetupScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.accentGreen.withOpacity(0.12),
+            color: AppTheme.accentGreen.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.shield_outlined, size: 48, color: AppTheme.accentGreen),
+          child: const Icon(
+            Icons.shield_outlined,
+            size: 48,
+            color: AppTheme.accentGreen,
+          ),
         ),
         const SizedBox(height: 24),
         const Text(
@@ -196,11 +214,20 @@ class _SetupScreenState extends State<SetupScreen> {
           ),
         ),
         const Spacer(),
-        _buildHighlightRow(Icons.check_circle_outline, 'Under 10ms CPU execution footprint'),
+        _buildHighlightRow(
+          Icons.check_circle_outline,
+          'Under 10ms CPU execution footprint',
+        ),
         const SizedBox(height: 12),
-        _buildHighlightRow(Icons.check_circle_outline, 'OLED pure-black battery saving surface'),
+        _buildHighlightRow(
+          Icons.check_circle_outline,
+          'OLED pure-black battery saving surface',
+        ),
         const SizedBox(height: 12),
-        _buildHighlightRow(Icons.check_circle_outline, 'Hardware mA telemetry & thermal filtering'),
+        _buildHighlightRow(
+          Icons.check_circle_outline,
+          'Hardware mA telemetry & thermal filtering',
+        ),
         const SizedBox(height: 20),
       ],
     );
@@ -213,10 +240,14 @@ class _SetupScreenState extends State<SetupScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.chargingCyan.withOpacity(0.12),
+            color: AppTheme.chargingCyan.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.bolt_rounded, size: 48, color: AppTheme.chargingCyan),
+          child: const Icon(
+            Icons.bolt_rounded,
+            size: 48,
+            color: AppTheme.chargingCyan,
+          ),
         ),
         const SizedBox(height: 24),
         const Text(
@@ -247,12 +278,20 @@ class _SetupScreenState extends State<SetupScreen> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.info_outline, color: AppTheme.chargingCyan, size: 24),
+              const Icon(
+                Icons.info_outline,
+                color: AppTheme.chargingCyan,
+                size: 24,
+              ),
               const SizedBox(width: 14),
               const Expanded(
                 child: Text(
                   'PowerWarden runs a minimal foreground service to monitor standby discharge without waking the CPU.',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
                 ),
               ),
             ],
@@ -271,19 +310,23 @@ class _SetupScreenState extends State<SetupScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: _isPaired
-                ? AppTheme.accentGreen.withOpacity(0.12)
-                : AppTheme.amber.withOpacity(0.12),
+                ? AppTheme.accentGreen.withValues(alpha: 0.12)
+                : AppTheme.amber.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
           child: Icon(
-            _isPaired ? Icons.verified_user_rounded : Icons.admin_panel_settings_rounded,
+            _isPaired
+                ? Icons.verified_user_rounded
+                : Icons.admin_panel_settings_rounded,
             size: 48,
             color: _isPaired ? AppTheme.accentGreen : AppTheme.amber,
           ),
         ),
         const SizedBox(height: 24),
         Text(
-          _isPaired ? 'Elevated Access\nGranted & Active' : 'Elevated System\nAccess (Recommended)',
+          _isPaired
+              ? 'Elevated Access\nGranted & Active'
+              : 'Elevated System\nAccess (Recommended)',
           style: const TextStyle(
             fontSize: 30,
             fontWeight: FontWeight.w900,
@@ -313,8 +356,8 @@ class _SetupScreenState extends State<SetupScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: _isPaired
-                    ? AppTheme.accentGreen.withOpacity(0.4)
-                    : AppTheme.amber.withOpacity(0.4),
+                    ? AppTheme.accentGreen.withValues(alpha: 0.4)
+                    : AppTheme.amber.withValues(alpha: 0.4),
               ),
             ),
             child: Row(
@@ -330,8 +373,14 @@ class _SetupScreenState extends State<SetupScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _isPaired ? 'Wireless ADB / Shizuku Configured' : 'Configure Shizuku or Wireless ADB',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        _isPaired
+                            ? 'Wireless ADB / Shizuku Configured'
+                            : 'Configure Shizuku or Wireless ADB',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -339,14 +388,19 @@ class _SetupScreenState extends State<SetupScreen> {
                             ? 'Pairing active. Tap to re-configure or check status.'
                             : 'Pair once in 30s to grant permanent permissions.',
                         style: TextStyle(
-                          color: _isPaired ? AppTheme.accentGreen : AppTheme.amber,
+                          color: _isPaired
+                              ? AppTheme.accentGreen
+                              : AppTheme.amber,
                           fontSize: 12,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.textMuted,
+                ),
               ],
             ),
           ),
@@ -364,7 +418,11 @@ class _SetupScreenState extends State<SetupScreen> {
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

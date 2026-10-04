@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../data/database/database.dart';
@@ -14,7 +15,8 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProviderStateMixin {
+class _HistoryScreenState extends State<HistoryScreen>
+    with SingleTickerProviderStateMixin {
   final AppDatabase _database = AppDatabase();
   final TelemetryService _telemetryService = TelemetryService();
 
@@ -59,15 +61,23 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight;
-    final surfaceVariant = isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight;
-    final surfaceBorder = isDark ? AppTheme.surfaceBorderDark : AppTheme.surfaceBorderLight;
+    final surfaceVariant = isDark
+        ? AppTheme.surfaceVariantDark
+        : AppTheme.surfaceVariantLight;
+    final surfaceBorder = isDark
+        ? AppTheme.surfaceBorderDark
+        : AppTheme.surfaceBorderLight;
     final textColor = isDark ? AppTheme.textPrimary : AppTheme.textPrimaryLight;
     final textMuted = isDark ? AppTheme.textMuted : AppTheme.textMutedLight;
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.pureOledBackground : AppTheme.lightBackground,
+      backgroundColor: isDark
+          ? AppTheme.pureOledBackground
+          : AppTheme.lightBackground,
       appBar: AppBar(
-        backgroundColor: isDark ? AppTheme.pureOledBackground : AppTheme.lightBackground,
+        backgroundColor: isDark
+            ? AppTheme.pureOledBackground
+            : AppTheme.lightBackground,
         title: Text(
           'Power History',
           style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
@@ -82,7 +92,10 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           labelPadding: EdgeInsets.zero,
           tabs: const [
             Tab(icon: Icon(Icons.flash_on_rounded, size: 18), text: 'Charge'),
-            Tab(icon: Icon(Icons.battery_alert_rounded, size: 18), text: 'Drain'),
+            Tab(
+              icon: Icon(Icons.battery_alert_rounded, size: 18),
+              text: 'Drain',
+            ),
             Tab(icon: Icon(Icons.apps_rounded, size: 18), text: 'Apps'),
             Tab(icon: Icon(Icons.nightlight_round, size: 18), text: 'Standby'),
           ],
@@ -93,17 +106,20 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
             icon: const Icon(Icons.battery_charging_full_rounded, size: 20),
             tooltip: 'Disable Battery Optimization (Don\'t Kill My App)',
             onPressed: () async {
-              final ok = await _telemetryService.requestIgnoreBatteryOptimizations();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(ok
+              final messenger = ScaffoldMessenger.of(context);
+              final ok = await _telemetryService
+                  .requestIgnoreBatteryOptimizations();
+              if (!mounted) return;
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(
+                    ok
                         ? 'Prompted battery optimization & OEM background autostart'
-                        : 'Battery optimization settings could not be opened'),
-                    duration: const Duration(seconds: 2),
+                        : 'Battery optimization settings could not be opened',
                   ),
-                );
-              }
+                  duration: const Duration(seconds: 2),
+                ),
+              );
             },
           ),
           IconButton(
@@ -141,10 +157,24 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 ),
 
                 // Tab 3: App Usage History
-                _buildAppUsageTab(surfaceColor, surfaceVariant, surfaceBorder, textColor, textMuted, isDark),
+                _buildAppUsageTab(
+                  surfaceColor,
+                  surfaceVariant,
+                  surfaceBorder,
+                  textColor,
+                  textMuted,
+                  isDark,
+                ),
 
                 // Tab 4: Standby Overnight History
-                _buildStandbyTab(surfaceColor, surfaceVariant, surfaceBorder, textColor, textMuted, isDark),
+                _buildStandbyTab(
+                  surfaceColor,
+                  surfaceVariant,
+                  surfaceBorder,
+                  textColor,
+                  textMuted,
+                  isDark,
+                ),
               ],
             ),
     );
@@ -162,14 +192,22 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     // Fallback: If no sessions recorded yet, reconstruct session from recent historical samples
     final effectiveSessions = List<PowerSession>.from(sessions);
     if (effectiveSessions.isEmpty && _historicalSamples.isNotEmpty) {
-      final matchingSamples = _historicalSamples.where((s) => isChargingTab ? s.isCharging : !s.isCharging).toList();
+      final matchingSamples = _historicalSamples
+          .where((s) => isChargingTab ? s.isCharging : !s.isCharging)
+          .toList();
       if (matchingSamples.length >= 2) {
         final first = matchingSamples.last;
         final last = matchingSamples.first;
         final delta = (last.batteryLevel - first.batteryLevel).abs();
-        final maxCur = matchingSamples.map((s) => s.currentMilliamps.abs()).reduce(math.max);
-        final minT = matchingSamples.map((s) => s.temperatureCelsius).reduce(math.min);
-        final maxT = matchingSamples.map((s) => s.temperatureCelsius).reduce(math.max);
+        final maxCur = matchingSamples
+            .map((s) => s.currentMilliamps.abs())
+            .reduce(math.max);
+        final minT = matchingSamples
+            .map((s) => s.temperatureCelsius)
+            .reduce(math.min);
+        final maxT = matchingSamples
+            .map((s) => s.temperatureCelsius)
+            .reduce(math.max);
 
         effectiveSessions.add(
           PowerSession(
@@ -184,7 +222,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
             peakWatts: (last.voltageMv / 1000.0) * (maxCur / 1000.0),
             minTempCelsius: minT,
             maxTempCelsius: maxT,
-            topAppName: _appUsageList.isNotEmpty ? (_appUsageList.first['name'] as String? ?? '') : '',
+            topAppName: _appUsageList.isNotEmpty
+                ? (_appUsageList.first['name'] as String? ?? '')
+                : '',
           ),
         );
       }
@@ -192,8 +232,12 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
 
     if (effectiveSessions.isEmpty) {
       return _buildEmptyState(
-        icon: isChargingTab ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
-        title: isChargingTab ? 'No charging sessions recorded yet' : 'No discharge cycles recorded yet',
+        icon: isChargingTab
+            ? Icons.battery_charging_full_rounded
+            : Icons.battery_std_rounded,
+        title: isChargingTab
+            ? 'No charging sessions recorded yet'
+            : 'No discharge cycles recorded yet',
         subtitle: isChargingTab
             ? 'Connect your phone to power to log charging speed, power (W), and battery health.'
             : 'Use your device on battery power to log discharge cycles and drain rates.',
@@ -207,9 +251,12 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
       itemCount: effectiveSessions.length,
       itemBuilder: (context, index) {
         final session = effectiveSessions[index];
-        final accentColor = session.isCharging ? AppTheme.chargingCyan : AppTheme.accentGreen;
+        final accentColor = session.isCharging
+            ? AppTheme.chargingCyan
+            : AppTheme.accentGreen;
         final sign = session.isCharging ? '+' : '-';
-        final deltaPercent = (session.endBatteryLevel - session.startBatteryLevel).abs();
+        final deltaPercent =
+            (session.endBatteryLevel - session.startBatteryLevel).abs();
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -231,7 +278,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      session.isCharging ? Icons.flash_on_rounded : Icons.battery_charging_full_rounded,
+                      session.isCharging
+                          ? Icons.flash_on_rounded
+                          : Icons.battery_charging_full_rounded,
                       color: accentColor,
                       size: 16,
                     ),
@@ -242,11 +291,19 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                     children: [
                       Text(
                         session.isCharging ? 'Charge Cycle' : 'Discharge Cycle',
-                        style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 14),
+                        style: TextStyle(
+                          color: textColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                       Text(
                         '${session.startBatteryLevel}% → ${session.endBatteryLevel}% ($sign$deltaPercent%)',
-                        style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: accentColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -256,7 +313,11 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                     children: [
                       Text(
                         '${session.durationMinutes} min',
-                        style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(
+                          color: textColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
                       Text(
                         '${session.startTime.hour.toString().padLeft(2, '0')}:${session.startTime.minute.toString().padLeft(2, '0')}',
@@ -268,7 +329,10 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: surfaceVariant,
                   borderRadius: BorderRadius.circular(10),
@@ -276,9 +340,21 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildStatCol('ENERGY', '$sign${session.totalMahDelta.abs()} mAh', accentColor),
-                    _buildStatCol('PEAK FLOW', '${session.peakMa.abs()} mA', textColor),
-                    _buildStatCol('PEAK POWER', '${session.peakWatts.toStringAsFixed(1)}W', textColor),
+                    _buildStatCol(
+                      'ENERGY',
+                      '$sign${session.totalMahDelta.abs()} mAh',
+                      accentColor,
+                    ),
+                    _buildStatCol(
+                      'PEAK FLOW',
+                      '${session.peakMa.abs()} mA',
+                      textColor,
+                    ),
+                    _buildStatCol(
+                      'PEAK POWER',
+                      '${session.peakWatts.toStringAsFixed(1)}W',
+                      textColor,
+                    ),
                     _buildStatCol(
                       'THERMAL',
                       '${session.minTempCelsius.toStringAsFixed(0)}° - ${session.maxTempCelsius.toStringAsFixed(0)}°C',
@@ -331,8 +407,13 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentGreen,
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
               ),
             ),
           ],
@@ -364,7 +445,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight,
+                  color: isDark
+                      ? AppTheme.surfaceVariantDark
+                      : AppTheme.surfaceVariantLight,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -384,7 +467,11 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                   children: [
                     Text(
                       name,
-                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(
+                        color: textColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -397,13 +484,19 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: (usagePercent > 20.0 ? AppTheme.amber : AppTheme.accentGreen).withValues(alpha: 0.12),
+                  color:
+                      (usagePercent > 20.0
+                              ? AppTheme.amber
+                              : AppTheme.accentGreen)
+                          .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${usagePercent.toStringAsFixed(1)}%',
                   style: TextStyle(
-                    color: usagePercent > 20.0 ? AppTheme.amber : AppTheme.accentGreen,
+                    color: usagePercent > 20.0
+                        ? AppTheme.amber
+                        : AppTheme.accentGreen,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -425,7 +518,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     bool isDark,
   ) {
     // Filter samples with sleep intervals > 1 minute for testing & real-world responsiveness
-    final sleepSamples = _historicalSamples.where((s) => s.sleepDurationMs > (1000 * 60)).toList();
+    final sleepSamples = _historicalSamples
+        .where((s) => s.sleepDurationMs > (1000 * 60))
+        .toList();
 
     if (sleepSamples.isEmpty) {
       return _buildEmptyState(
@@ -442,7 +537,8 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
       itemCount: sleepSamples.length,
       itemBuilder: (context, index) {
         final sample = sleepSamples[index];
-        final hours = (sample.sleepDurationMs / (1000.0 * 60 * 60)).toStringAsFixed(1);
+        final hours = (sample.sleepDurationMs / (1000.0 * 60 * 60))
+            .toStringAsFixed(1);
         final absMa = sample.currentMilliamps.abs();
         final idleBurnRate = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
         final isCleanSleep = absMa < 280;
@@ -454,7 +550,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
             color: surfaceColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isCleanSleep ? surfaceBorder : AppTheme.amber.withValues(alpha: 0.4),
+              color: isCleanSleep
+                  ? surfaceBorder
+                  : AppTheme.amber.withValues(alpha: 0.4),
             ),
           ),
           child: Row(
@@ -462,7 +560,8 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (isCleanSleep ? AppTheme.accentGreen : AppTheme.amber).withValues(alpha: 0.12),
+                  color: (isCleanSleep ? AppTheme.accentGreen : AppTheme.amber)
+                      .withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -478,7 +577,11 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                   children: [
                     Text(
                       '${hours}h Standby Sleep',
-                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 14),
+                      style: TextStyle(
+                        color: textColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -499,7 +602,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                   Text(
                     '-$absMa mA',
                     style: TextStyle(
-                      color: isCleanSleep ? AppTheme.chargingCyan : AppTheme.amber,
+                      color: isCleanSleep
+                          ? AppTheme.chargingCyan
+                          : AppTheme.amber,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -540,7 +645,11 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           const SizedBox(height: 16),
           Text(
             title,
-            style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),

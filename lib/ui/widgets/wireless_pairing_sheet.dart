@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../services/telemetry_service.dart';
 import '../theme.dart';
 
@@ -25,7 +27,8 @@ class WirelessPairingSheet extends StatefulWidget {
   State<WirelessPairingSheet> createState() => _WirelessPairingSheetState();
 }
 
-class _WirelessPairingSheetState extends State<WirelessPairingSheet> with SingleTickerProviderStateMixin {
+class _WirelessPairingSheetState extends State<WirelessPairingSheet>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TelemetryService _telemetryService = TelemetryService();
 
@@ -167,10 +170,14 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppTheme.accentGreen.withOpacity(0.12),
+                        color: AppTheme.accentGreen.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.shield_rounded, color: AppTheme.accentGreen, size: 20),
+                      child: const Icon(
+                        Icons.shield_rounded,
+                        color: AppTheme.accentGreen,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -179,17 +186,27 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                         children: [
                           Text(
                             'Elevated Diagnostics',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                           Text(
                             'Shizuku or Auto-Detected Wireless ADB',
-                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: AppTheme.textSecondary,
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -230,23 +247,37 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: AppTheme.chargingCyan.withOpacity(0.1),
+                                color: AppTheme.chargingCyan.withValues(
+                                  alpha: 0.1,
+                                ),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppTheme.chargingCyan.withOpacity(0.3)),
+                                border: Border.all(
+                                  color: AppTheme.chargingCyan.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.notifications_active_rounded, color: AppTheme.chargingCyan, size: 18),
+                                      const Icon(
+                                        Icons.notifications_active_rounded,
+                                        color: AppTheme.chargingCyan,
+                                        size: 18,
+                                      ),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
                                           _discoveredPort > 0
                                               ? 'Port Auto-Detected: $_discoveredPort'
                                               : 'Searching for port on Wi-Fi via mDNS...',
-                                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -254,20 +285,38 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                                   const SizedBox(height: 6),
                                   const Text(
                                     '1. Tap the button below to jump straight to Developer Settings.\n2. Tap "Pair device with pairing code".\n3. Note the 5-digit Port & 6-digit Code shown on screen and enter them below.',
-                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, height: 1.4),
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 11,
+                                      height: 1.4,
+                                    ),
                                   ),
                                   const SizedBox(height: 10),
                                   SizedBox(
                                     width: double.infinity,
                                     height: 36,
                                     child: ElevatedButton.icon(
-                                      onPressed: () => _telemetryService.openWirelessDebuggingSettings(),
-                                      icon: const Icon(Icons.open_in_new_rounded, size: 14),
-                                      label: const Text('Open Wireless Debugging Settings', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      onPressed: () => _telemetryService
+                                          .openWirelessDebuggingSettings(),
+                                      icon: const Icon(
+                                        Icons.open_in_new_rounded,
+                                        size: 14,
+                                      ),
+                                      label: const Text(
+                                        'Open Wireless Debugging Settings',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.chargingCyan,
                                         foregroundColor: Colors.black,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -288,18 +337,38 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                                       FilteringTextInputFormatter.digitsOnly,
                                       LengthLimitingTextInputFormatter(5),
                                     ],
-                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                     decoration: InputDecoration(
                                       labelText: 'Port',
-                                      labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                                      hintText: _discoveredPort > 0 ? '$_discoveredPort' : '37755',
-                                      hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                                      labelStyle: const TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontSize: 11,
+                                      ),
+                                      hintText: _discoveredPort > 0
+                                          ? '$_discoveredPort'
+                                          : '37755',
+                                      hintStyle: const TextStyle(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 12,
+                                      ),
                                       filled: true,
                                       fillColor: AppTheme.surfaceVariant,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 10,
+                                          ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide.none,
+                                      ),
                                     ),
-                                    onSubmitted: (_) => _codeFocus.requestFocus(),
+                                    onSubmitted: (_) =>
+                                        _codeFocus.requestFocus(),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -322,13 +391,27 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                                     ),
                                     decoration: InputDecoration(
                                       labelText: '6-Digit Code',
-                                      labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                                      labelStyle: const TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontSize: 11,
+                                      ),
                                       hintText: '123456',
-                                      hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12, letterSpacing: 0),
+                                      hintStyle: const TextStyle(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 12,
+                                        letterSpacing: 0,
+                                      ),
                                       filled: true,
                                       fillColor: AppTheme.surfaceVariant,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 10,
+                                          ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide.none,
+                                      ),
                                     ),
                                     onSubmitted: (_) => _handleKadbPair(),
                                   ),
@@ -340,19 +423,40 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                               width: double.infinity,
                               height: 38,
                               child: ElevatedButton.icon(
-                                onPressed: _isPairingKadb ? null : _handleKadbPair,
+                                onPressed: _isPairingKadb
+                                    ? null
+                                    : _handleKadbPair,
                                 icon: _isPairingKadb
-                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                                    : const Icon(Icons.wifi_tethering_rounded, size: 16),
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.black,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.wifi_tethering_rounded,
+                                        size: 16,
+                                      ),
                                 label: Text(
-                                  _isPairingKadb ? 'Pairing...' : 'Pair Manually in App',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                  _isPairingKadb
+                                      ? 'Pairing...'
+                                      : 'Pair Manually in App',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.surfaceVariant,
                                   foregroundColor: Colors.white,
-                                  side: const BorderSide(color: AppTheme.surfaceBorder),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  side: const BorderSide(
+                                    color: AppTheme.surfaceBorder,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
                                 ),
                               ),
                             ),
@@ -362,7 +466,9 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                                 _kadbMessage!,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: _kadbMessage!.startsWith('✓') ? AppTheme.accentGreen : AppTheme.crimson,
+                                  color: _kadbMessage!.startsWith('✓')
+                                      ? AppTheme.accentGreen
+                                      : AppTheme.crimson,
                                 ),
                               ),
                             ],
@@ -376,7 +482,11 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                         children: [
                           const Text(
                             'Shizuku binds permanently via Android Binder IPC. Once allowed, permissions survive app switches and phone locks.',
-                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
                           ),
                           const SizedBox(height: 14),
                           Container(
@@ -391,29 +501,42 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                                 Icon(
                                   widget.hasPermission
                                       ? Icons.check_circle_rounded
-                                      : (widget.hasShizuku ? Icons.verified_user_rounded : Icons.info_outline_rounded),
+                                      : (widget.hasShizuku
+                                            ? Icons.verified_user_rounded
+                                            : Icons.info_outline_rounded),
                                   color: widget.hasPermission
                                       ? AppTheme.accentGreen
-                                      : (widget.hasShizuku ? AppTheme.chargingCyan : AppTheme.amber),
+                                      : (widget.hasShizuku
+                                            ? AppTheme.chargingCyan
+                                            : AppTheme.amber),
                                   size: 26,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'Shizuku Service',
-                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
                                       ),
                                       Text(
                                         widget.hasPermission
                                             ? 'Authorized & Active'
-                                            : (widget.hasShizuku ? 'Ready to Authorize' : 'Start Shizuku App'),
+                                            : (widget.hasShizuku
+                                                  ? 'Ready to Authorize'
+                                                  : 'Start Shizuku App'),
                                         style: TextStyle(
                                           color: widget.hasPermission
                                               ? AppTheme.accentGreen
-                                              : (widget.hasShizuku ? AppTheme.chargingCyan : AppTheme.textMuted),
+                                              : (widget.hasShizuku
+                                                    ? AppTheme.chargingCyan
+                                                    : AppTheme.textMuted),
                                           fontSize: 11,
                                         ),
                                       ),
@@ -421,15 +544,25 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                                   ),
                                 ),
                                 ElevatedButton(
-                                  onPressed: widget.hasPermission || _isRequesting ? null : _handleShizukuAuthorize,
+                                  onPressed:
+                                      widget.hasPermission || _isRequesting
+                                      ? null
+                                      : _handleShizukuAuthorize,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.accentGreen,
                                     foregroundColor: Colors.black,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
                                   child: Text(
-                                    widget.hasPermission ? 'Active' : (_isRequesting ? '...' : 'Authorize'),
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                    widget.hasPermission
+                                        ? 'Active'
+                                        : (_isRequesting ? '...' : 'Authorize'),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -441,7 +574,9 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet> with Single
                               _shizukuMessage!,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: _shizukuMessage!.startsWith('✓') ? AppTheme.accentGreen : AppTheme.crimson,
+                                color: _shizukuMessage!.startsWith('✓')
+                                    ? AppTheme.accentGreen
+                                    : AppTheme.crimson,
                               ),
                             ),
                           ],
