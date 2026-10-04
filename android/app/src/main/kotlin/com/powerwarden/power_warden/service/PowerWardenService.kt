@@ -90,28 +90,39 @@ class PowerWardenService : Service() {
         return START_STICKY
     }
 
+    private var smoothedMaEwma: Double = 0.0
+
     private fun updateSmartNotification(metrics: Map<String, Any>) {
         val isCharging = (metrics["isCharging"] as? Boolean) ?: false
         val level = (metrics["batteryLevel"] as? Int) ?: 50
         val currentMa = (metrics["currentMa"] as? Int) ?: 0
         val absMa = Math.abs(currentMa)
+
+        // Exponential Moving Average filter (alpha = 0.25) to smooth out instant 1-sample spikes in notification
+        if (smoothedMaEwma == 0.0) {
+            smoothedMaEwma = absMa.toDouble()
+        } else {
+            smoothedMaEwma = (0.25 * absMa) + (0.75 * smoothedMaEwma)
+        }
+        val displayMa = Math.round(smoothedMaEwma).toInt()
+
         val temp = (metrics["temperatureCelsius"] as? Double) ?: 35.0
         val voltageMv = (metrics["voltageMv"] as? Int) ?: 4000
-        val watts = String.format("%.1f", (voltageMv / 1000.0) * (absMa / 1000.0))
-        val percentPerHour = String.format("%.1f", (absMa / 4500.0) * 100.0)
+        val watts = String.format("%.1f", (voltageMv / 1000.0) * (displayMa / 1000.0))
+        val percentPerHour = String.format("%.1f", (displayMa / 4500.0) * 100.0)
 
         val title: String
         val content: String
 
         if (isCharging) {
-            title = "⚡ Charging: $level% · +$absMa mA (${watts}W)"
+            title = "⚡ Charging: $level% · +$displayMa mA (${watts}W)"
             content = "Temp: ${String.format("%.1f", temp)}°C · Fast charging healthy"
         } else if (currentDrainSpike(metrics)) {
-            title = "⚠️ High Discharge: $level% · -$absMa mA ($percentPerHour%/hr)"
+            title = "⚠️ High Discharge: $level% · -$displayMa mA ($percentPerHour%/hr)"
             content = "Heavy battery burn detected · Temp: ${String.format("%.1f", temp)}°C"
         } else {
             val hoursLeft = String.format("%.1f", level * 0.22)
-            title = "🔋 $level% · -$absMa mA ($percentPerHour%/hr)"
+            title = "🔋 $level% · -$displayMa mA ($percentPerHour%/hr)"
             content = "About ${hoursLeft}h left · ${String.format("%.1f", temp)}°C · All calm"
         }
 

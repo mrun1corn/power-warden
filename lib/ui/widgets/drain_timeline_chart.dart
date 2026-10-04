@@ -33,10 +33,10 @@ class DrainTimelineChart extends StatelessWidget {
       );
     }
 
-    // Generate spots for current mA
+    // Generate spots for current magnitude in mA (always positive to prevent negative plunging spikes)
     final currentSpots = <FlSpot>[];
     for (int i = 0; i < samples.length; i++) {
-      currentSpots.add(FlSpot(i.toDouble(), samples[i].currentMilliamps.toDouble()));
+      currentSpots.add(FlSpot(i.toDouble(), samples[i].currentMilliamps.abs().toDouble()));
     }
 
     // Find bounds with safety margin to prevent labels from colliding or clipping
