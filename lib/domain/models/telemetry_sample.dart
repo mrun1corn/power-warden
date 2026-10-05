@@ -9,6 +9,7 @@ class TelemetrySample {
   final bool isCharging; // True if plugged into AC/USB
   final int voltageMv; // e.g. 4120 mV
   final int sleepDurationMs;
+  final double refreshRate; // Live panel refresh rate (e.g. 60.0, 90.0, 120.0 Hz)
 
   const TelemetrySample({
     this.id,
@@ -21,6 +22,7 @@ class TelemetrySample {
     required this.isCharging,
     required this.voltageMv,
     this.sleepDurationMs = 0,
+    this.refreshRate = 60.0,
   });
 
   TelemetrySample copyWith({
@@ -34,6 +36,7 @@ class TelemetrySample {
     bool? isCharging,
     int? voltageMv,
     int? sleepDurationMs,
+    double? refreshRate,
   }) {
     return TelemetrySample(
       id: id ?? this.id,
@@ -46,6 +49,7 @@ class TelemetrySample {
       isCharging: isCharging ?? this.isCharging,
       voltageMv: voltageMv ?? this.voltageMv,
       sleepDurationMs: sleepDurationMs ?? this.sleepDurationMs,
+      refreshRate: refreshRate ?? this.refreshRate,
     );
   }
 
@@ -61,6 +65,7 @@ class TelemetrySample {
       'isCharging': isCharging,
       'voltageMv': voltageMv,
       'sleepDurationMs': sleepDurationMs,
+      'refreshRate': refreshRate,
     };
   }
 
@@ -84,6 +89,7 @@ class TelemetrySample {
     final charging = (map['isCharging'] ?? !(map['isDischarging'] ?? true)) as bool;
     final voltage = (map['voltageMv'] ?? map['voltage'] ?? 0) as int;
     final sleepMs = (map['sleepDurationMs'] ?? 0) as int;
+    final hz = ((map['refreshRate'] ?? 60.0) as num).toDouble();
 
     return TelemetrySample(
       id: map['id'] as int?,
@@ -96,6 +102,7 @@ class TelemetrySample {
       isCharging: charging,
       voltageMv: voltage,
       sleepDurationMs: sleepMs,
+      refreshRate: hz > 0 ? hz : 60.0,
     );
   }
 }

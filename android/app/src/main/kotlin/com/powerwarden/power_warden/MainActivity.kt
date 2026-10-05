@@ -127,6 +127,7 @@ class MainActivity : FlutterActivity() {
                         "isCharging" to snap.isCharging,
                         "thermalStatus" to thermalObserver.currentStatus,
                         "isScreenOn" to screenObserver.isScreenOn,
+                        "refreshRate" to screenObserver.getActiveRefreshRate(),
                         "sleepDurationMs" to screenObserver.getCurrentSleepDurationMs()
                     )
                     result.success(map)

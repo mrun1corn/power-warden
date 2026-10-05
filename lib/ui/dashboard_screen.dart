@@ -743,11 +743,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               final isCriticalCpu = cpu > 25.0;
 
               // AOSP Power Profile Model for realistic lower-bound app drain detection:
-              // Isolate display baseline (~240-280mA) and radio baseline (~40mA) so app mA is never falsely inflated.
+              // Dynamically scales display baseline according to active panel refresh rate (60Hz vs 90Hz vs 120Hz vs 144Hz):
+              // At 60Hz: max display draw is ~140mA; at 120Hz: ~260mA.
               final totalMa = (_currentSample?.currentMilliamps.abs() ?? 450);
               final isScreenOn = _currentSample?.isScreenOn ?? true;
+              final hz = _currentSample?.refreshRate ?? 60.0;
+              final hzScale = (hz > 0 ? (hz / 120.0) : 0.5).clamp(0.4, 1.25);
+              final maxDisplayBaseline = 260.0 * hzScale;
               final screenBaseline = isScreenOn
-                  ? math.min(totalMa * 0.55, 260.0)
+                  ? math.min(totalMa * 0.55, maxDisplayBaseline)
                   : 0.0;
               final radioBaseline = isScreenOn ? 40.0 : 15.0;
               final processPool = math.max(

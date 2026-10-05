@@ -519,16 +519,16 @@ class _HistoryScreenState extends State<HistoryScreen>
     Color textMuted,
     bool isDark,
   ) {
-    // Filter samples with sleep intervals > 1 minute for testing & real-world responsiveness
+    // Filter samples with sleep intervals > 30 seconds
     final sleepSamples = _historicalSamples
-        .where((s) => s.sleepDurationMs > (1000 * 60))
+        .where((s) => s.sleepDurationMs > (1000 * 30))
         .toList();
 
     if (sleepSamples.isEmpty) {
       return _buildEmptyState(
         icon: Icons.nightlight_round,
-        title: 'No sleep standby intervals detected yet',
-        subtitle: 'PowerWarden automatically tracks standby sessions when your phone rests overnight or sleeps for >30 minutes.',
+        title: 'No standby sleep intervals detected yet',
+        subtitle: 'PowerWarden automatically tracks standby sessions when your display turns off and sleeps.',
         textColor: textColor,
         textMuted: textMuted,
       );
@@ -539,11 +539,29 @@ class _HistoryScreenState extends State<HistoryScreen>
       itemCount: sleepSamples.length,
       itemBuilder: (context, index) {
         final sample = sleepSamples[index];
-        final hours = (sample.sleepDurationMs / (1000.0 * 60 * 60))
-            .toStringAsFixed(1);
+        final sleepDuration = Duration(milliseconds: sample.sleepDurationMs);
+        final durationLabel = PowerFormatters.duration(sleepDuration);
         final absMa = sample.currentMilliamps.abs();
         final idleBurnRate = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
-        final isCleanSleep = absMa < 280;
+
+        final Color statusColor;
+        final String statusPill;
+        final String statusDesc;
+        if (absMa < 180) {
+          statusColor = AppTheme.accentGreen;
+          statusPill = 'DEEP SLEEP';
+          statusDesc = 'Optimal deep sleep (suspend)';
+        } else if (absMa < 350) {
+          statusColor = AppTheme.chargingCyan;
+          statusPill = 'LIGHT REST';
+          statusDesc = 'Normal sync & background radios';
+        } else {
+          statusColor = AppTheme.amber;
+          statusPill = 'WAKELOCK LEAK';
+          statusDesc = 'Rogue background wakelock active';
+        }
+
+        final isOvernight = sleepDuration.inHours >= 4;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -552,70 +570,109 @@ class _HistoryScreenState extends State<HistoryScreen>
             color: surfaceColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isCleanSleep
-                  ? surfaceBorder
-                  : AppTheme.amber.withValues(alpha: 0.4),
+              color: statusColor.withValues(alpha: absMa >= 350 ? 0.4 : 0.2),
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: (isCleanSleep ? AppTheme.accentGreen : AppTheme.amber)
-                      .withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.bedtime_rounded,
-                  color: isCleanSleep ? AppTheme.accentGreen : AppTheme.amber,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${hours}h Standby Sleep',
-                      style: TextStyle(
-                        color: textColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isOvernight ? Icons.bedtime_rounded : Icons.nightlight_round,
+                      color: statusColor,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isOvernight ? '$durationLabel Overnight Sleep' : '$durationLabel Standby Rest',
+                          style: TextStyle(
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$statusDesc • -$idleBurnRate%/hr',
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    height: 26,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.35),
+                        width: 1,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isCleanSleep
-                          ? 'Deep sleep healthy • -$idleBurnRate%/hr'
-                          : 'Mild wakefulness detected • -$idleBurnRate%/hr',
+                    child: Text(
+                      statusPill,
                       style: TextStyle(
-                        color: isCleanSleep ? textMuted : AppTheme.amber,
-                        fontSize: 11,
+                        color: statusColor,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.4,
                       ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: surfaceVariant,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStatCol(
+                      'STANDBY DRAIN',
+                      '-$absMa mA',
+                      statusColor,
+                    ),
+                    _buildStatCol(
+                      'BURN VELOCITY',
+                      '-$idleBurnRate%/hr',
+                      textColor,
+                    ),
+                    _buildStatCol(
+                      'TEMPERATURE',
+                      '${sample.temperatureCelsius.toStringAsFixed(1)}°C',
+                      textColor,
+                    ),
+                    _buildStatCol(
+                      'RECORDED',
+                      PowerFormatters.relativeTime(sample.timestamp).split('(').first.trim(),
+                      textMuted,
                     ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '-$absMa mA',
-                    style: TextStyle(
-                      color: isCleanSleep
-                          ? AppTheme.chargingCyan
-                          : AppTheme.amber,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                  Text(
-                    '${sample.temperatureCelsius.toStringAsFixed(1)}°C',
-                    style: TextStyle(color: textMuted, fontSize: 10),
-                  ),
-                ],
               ),
             ],
           ),

@@ -75,4 +75,19 @@ class ScreenObserver(
             lastSleepDurationMs
         }
     }
+
+    /**
+     * Dynamically queries the current display mode's refresh rate (Hz) in real-time.
+     * Accurately distinguishes between 60Hz, 90Hz, 120Hz, and 144Hz panels to scale display baseline drain.
+     */
+    fun getActiveRefreshRate(): Float {
+        if (!isScreenOn) return 0f
+        return try {
+            val dm = context.getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager
+            val display = dm?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+            display?.refreshRate ?: 60f
+        } catch (_: Exception) {
+            60f
+        }
+    }
 }
