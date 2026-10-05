@@ -47,8 +47,8 @@ void main() {
       final sample = TelemetrySample(
         timestamp: DateTime.now(),
         batteryLevel: 80,
-        currentMilliamps: 1500,
-        temperatureCelsius: 42.0,
+        currentMilliamps: 1650,
+        temperatureCelsius: 42.5,
         thermalStatus: 2,
         isScreenOn: true,
         isCharging: false,

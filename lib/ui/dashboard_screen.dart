@@ -162,14 +162,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Check if charging state changed (e.g. plugged in or unplugged)
     if (_sessionIsCharging != sample.isCharging) {
-      final startTime =
-          _sessionStartTime ?? now.subtract(const Duration(minutes: 1));
-      final duration = now.difference(startTime);
+      final startTime = _sessionStartTime;
+      final duration = startTime != null ? now.difference(startTime) : Duration.zero;
 
-      // Save valid charging or discharging sessions
-      if (duration.inSeconds >= 10) {
-        final startLvl = _sessionStartLevel ?? sample.batteryLevel;
-        final deltaPercent = (sample.batteryLevel - startLvl).abs();
+      // Save valid charging or discharging sessions (must be >= 45 seconds or gained/lost >= 1%)
+      final startLvl = _sessionStartLevel ?? sample.batteryLevel;
+      final deltaPercent = (sample.batteryLevel - startLvl).abs();
+
+      if (duration.inSeconds >= 45 || deltaPercent >= 1) {
         final mahDelta = math.max(15, ((deltaPercent / 100.0) * 4500).round());
         final topApp = _topProcesses.isNotEmpty
             ? (_topProcesses.first['name'] as String? ?? '')
@@ -178,7 +178,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final session = PowerSession(
           id: now.millisecondsSinceEpoch.toString(),
           type: _sessionIsCharging! ? 'charging' : 'discharging',
-          startTime: startTime,
+          startTime: startTime ?? now.subtract(duration),
           endTime: now,
           startBatteryLevel: startLvl,
           endBatteryLevel: sample.batteryLevel,

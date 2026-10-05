@@ -123,11 +123,15 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
       setState(() {
         _isPairingKadb = false;
         _kadbMessage = ok
-            ? '✓ Successfully paired via Wireless ADB!'
+            ? '✓ Successfully Paired & Connected to Wireless ADB!'
             : '✗ Connection to port $port failed. Please verify Wireless Debugging is enabled.';
       });
       if (ok) {
-        widget.onAuthorized();
+        // Allow user to visibly see the success banner before closing modal
+        await Future.delayed(const Duration(milliseconds: 1200));
+        if (mounted) {
+          widget.onAuthorized();
+        }
       }
     }
   }

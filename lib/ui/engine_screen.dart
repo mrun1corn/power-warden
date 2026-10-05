@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../data/database/database.dart';
@@ -20,6 +22,7 @@ class _EngineScreenState extends State<EngineScreen> {
   final TelemetryService _telemetryService = TelemetryService();
   final AppDatabase _database = AppDatabase();
 
+  Timer? _autoRefreshTimer;
   Map<String, bool> _elevatedStatus = {};
   bool _isBatteryOptimized = false;
   bool _isAccessibilityActive = false;
@@ -29,6 +32,30 @@ class _EngineScreenState extends State<EngineScreen> {
   void initState() {
     super.initState();
     _loadState();
+
+    // Auto-refresh engine diagnostics every 5 seconds dynamically
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _refreshSilently();
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshSilently() async {
+    final status = await _telemetryService.getElevatedStatus();
+    final isIgnored = await _telemetryService.isBatteryOptimizationIgnored();
+    final isAccess = await _telemetryService.isAccessibilityServiceActive();
+    if (mounted) {
+      setState(() {
+        _elevatedStatus = status;
+        _isBatteryOptimized = !isIgnored;
+        _isAccessibilityActive = isAccess;
+      });
+    }
   }
 
   Future<void> _loadState() async {

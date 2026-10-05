@@ -157,7 +157,10 @@ class PowerWardenService : Service() {
     private fun currentDrainSpike(metrics: Map<String, Any>): Boolean {
         val isScreenOn = (metrics["isScreenOn"] as? Boolean) ?: true
         val currentMa = Math.abs((metrics["currentMa"] as? Int) ?: 0)
-        return (!isScreenOn && currentMa > 300) || (isScreenOn && currentMa > 1200)
+        val temp = (metrics["temperatureCelsius"] as? Double) ?: 30.0
+        // Screen OFF: Standby draw > 450mA indicates a heavy rogue sleep wakelock
+        // Screen ON: Active draw > 1600mA with high thermal load (>=40°C)
+        return (!isScreenOn && currentMa > 450) || (isScreenOn && currentMa > 1600 && temp >= 40.0)
     }
 
     private fun startForegroundWithNotification() {

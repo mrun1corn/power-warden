@@ -60,6 +60,11 @@ class DrainTimelineChart extends StatelessWidget {
     final chartMinY = (minVal - 60).clamp(0.0, double.infinity);
     final chartMaxY = maxVal + 60;
 
+    final isCurrentlyCharging = samples.isNotEmpty && samples.last.isCharging;
+    final primaryColor = isCurrentlyCharging ? AppTheme.chargingCyan : AppTheme.accentGreen;
+    final eventTitle = isCurrentlyCharging ? 'CHARGING FLOW TIMELINE' : 'DISCHARGE FLOW TIMELINE';
+    final flowLabel = isCurrentlyCharging ? 'Charge Flow (+mA)' : 'Discharge (-mA)';
+
     return Container(
       height: 240,
       padding: const EdgeInsets.only(top: 16, bottom: 12, right: 16, left: 4),
@@ -77,7 +82,7 @@ class DrainTimelineChart extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'DISCHARGE TIMELINE',
+                  eventTitle,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -85,22 +90,22 @@ class DrainTimelineChart extends StatelessWidget {
                     color: textMuted,
                   ),
                 ),
-                // Legend with Clear Labels
+                // Legend with Clear Event Labels
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.chargingCyan,
+                      decoration: BoxDecoration(
+                        color: primaryColor,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Flow Rate (mA)',
-                      style: TextStyle(color: textMuted, fontSize: 10),
+                      flowLabel,
+                      style: TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -193,9 +198,11 @@ class DrainTimelineChart extends StatelessWidget {
                         return touchedSpots.map((spot) {
                           final idx = spot.x.toInt().clamp(0, samples.length - 1);
                           final s = samples[idx];
+                          final eventSign = s.isCharging ? '+' : '-';
+                          final eventType = s.isCharging ? 'Charging' : 'Discharging';
                           final screenLabel = s.isScreenOn ? 'Screen On' : 'Asleep';
                           return LineTooltipItem(
-                            '${spot.y.toInt()} mA (${s.batteryLevel}%)\n${s.temperatureCelsius.toStringAsFixed(1)}°C • $screenLabel',
+                            '$eventSign${spot.y.toInt()} mA ($eventType · ${s.batteryLevel}%)\n${s.temperatureCelsius.toStringAsFixed(1)}°C • $screenLabel',
                             TextStyle(
                               color: isDark ? Colors.white : Colors.black,
                               fontSize: 10.5,
@@ -211,8 +218,8 @@ class DrainTimelineChart extends StatelessWidget {
                       spots: currentSpots,
                       isCurved: true,
                       curveSmoothness: 0.2,
-                      color: AppTheme.chargingCyan,
-                      barWidth: 2.0,
+                      color: primaryColor,
+                      barWidth: 2.2,
                       isStrokeCapRound: true,
                       dotData: const FlDotData(show: false),
                       belowBarData: BarAreaData(
@@ -221,8 +228,8 @@ class DrainTimelineChart extends StatelessWidget {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            AppTheme.chargingCyan.withValues(alpha: 0.18),
-                            AppTheme.chargingCyan.withValues(alpha: 0.0),
+                            primaryColor.withValues(alpha: 0.2),
+                            primaryColor.withValues(alpha: 0.0),
                           ],
                         ),
                       ),

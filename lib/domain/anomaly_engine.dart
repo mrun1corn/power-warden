@@ -105,9 +105,10 @@ class AnomalyEngine {
     }
 
     // --- Scenario B: Device is AWAKE (Screen ON) ---
-    // Active screen (120Hz OLED, 5G, CPU) legitimately consumes 400-800mA.
-    // Only flag as CRITICAL emergency if sustained draw exceeds 1,400mA with high heat (thermal runaway).
-    if (sample.currentMilliamps >= 1400 && (sample.thermalStatus >= 2 || sample.temperatureCelsius >= 41.0)) {
+    // Active screen (120Hz OLED, 5G, CPU) legitimately consumes 400-900mA.
+    // Strictly require extreme physical draw (>1,600mA) AND dangerous battery temperature (>= 42°C)
+    // to avoid false emergency alarms while user is simply using the phone.
+    if (sample.currentMilliamps >= 1500 && (sample.thermalStatus >= 2 || sample.temperatureCelsius >= 42.0)) {
       return AnomalyIncident(
         startTime: sample.timestamp,
         severity: AnomalySeverity.critical,

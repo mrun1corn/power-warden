@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../core/formatters.dart';
 import '../../data/database/database.dart';
 import '../../domain/models/power_session.dart';
 import '../../domain/models/telemetry_sample.dart';
@@ -313,7 +314,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '${session.durationMinutes} min',
+                        session.formattedDuration,
                         style: TextStyle(
                           color: textColor,
                           fontWeight: FontWeight.bold,
@@ -321,7 +322,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                         ),
                       ),
                       Text(
-                        _formatSessionTime(session.startTime.toLocal()),
+                        PowerFormatters.relativeTime(session.startTime),
                         style: TextStyle(color: textMuted, fontSize: 11),
                       ),
                     ],
@@ -662,21 +663,6 @@ class _HistoryScreenState extends State<HistoryScreen>
         ],
       ),
     );
-  }
-
-  String _formatSessionTime(DateTime dt) {
-    final hour = dt.hour.toString().padLeft(2, '0');
-    final minute = dt.minute.toString().padLeft(2, '0');
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-
-    if (diff.inMinutes < 60) {
-      return '$hour:$minute (${diff.inMinutes}m ago)';
-    } else if (diff.inHours < 24 && dt.day == now.day) {
-      return '$hour:$minute (${diff.inHours}h ago)';
-    } else {
-      return '${dt.month}/${dt.day} $hour:$minute';
-    }
   }
 
   Widget _buildStatCol(String label, String value, Color color) {

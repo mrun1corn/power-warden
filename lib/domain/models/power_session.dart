@@ -1,3 +1,5 @@
+import '../../core/formatters.dart';
+
 class PowerSession {
   final String id;
   final String type; // 'charging' or 'discharging'
@@ -32,7 +34,10 @@ class PowerSession {
   });
 
   bool get isCharging => type == 'charging';
-  int get durationMinutes => endTime.difference(startTime).inMinutes;
+  Duration get duration => endTime.difference(startTime);
+  int get durationMinutes => duration.inMinutes;
+
+  String get formattedDuration => PowerFormatters.duration(duration);
 
   Map<String, dynamic> toMap() {
     return {
