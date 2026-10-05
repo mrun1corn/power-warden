@@ -144,16 +144,15 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
         child: Container(
+          height: MediaQuery.of(context).size.height * 0.72,
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           decoration: const BoxDecoration(
             color: AppTheme.surface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                 Center(
                   child: Container(
                     width: 36,
@@ -228,102 +227,31 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
                     ),
                     dividerColor: Colors.transparent,
                     tabs: const [
-                      Tab(text: 'Wireless ADB (Kadb)'),
+                      Tab(text: 'Pair with Code'),
                       Tab(text: 'Shizuku API'),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
-                SizedBox(
-                  height: 310,
+                Expanded(
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      // Tab 1: Wireless ADB (Auto mDNS + Redirect Button + Notification Reply)
+                      // Tab 1: Wireless ADB (Auto mDNS + PIN/Port Input + Quick Redirect)
                       SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppTheme.chargingCyan.withValues(
-                                  alpha: 0.1,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: AppTheme.chargingCyan.withValues(
-                                    alpha: 0.3,
-                                  ),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.notifications_active_rounded,
-                                        color: AppTheme.chargingCyan,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          _discoveredPort > 0
-                                              ? 'Port Auto-Detected: $_discoveredPort'
-                                              : 'Searching for port on Wi-Fi via mDNS...',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  const Text(
-                                    '1. Tap the button below to jump straight to Developer Settings.\n2. Tap "Pair device with pairing code".\n3. Note the 5-digit Port & 6-digit Code shown on screen and enter them below.',
-                                    style: TextStyle(
-                                      color: AppTheme.textSecondary,
-                                      fontSize: 11,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 36,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () => _telemetryService
-                                          .openWirelessDebuggingSettings(),
-                                      icon: const Icon(
-                                        Icons.open_in_new_rounded,
-                                        size: 14,
-                                      ),
-                                      label: const Text(
-                                        'Open Wireless Debugging Settings',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.chargingCyan,
-                                        foregroundColor: Colors.black,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            const Text(
+                              'ENTER 6-DIGIT PIN & PORT',
+                              style: TextStyle(
+                                color: AppTheme.chargingCyan,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             Row(
                               children: [
                                 Expanded(
@@ -339,11 +267,11 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
                                     ],
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 13,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                     ),
                                     decoration: InputDecoration(
-                                      labelText: 'Port',
+                                      labelText: '5-Digit Port',
                                       labelStyle: const TextStyle(
                                         color: AppTheme.textSecondary,
                                         fontSize: 11,
@@ -359,11 +287,11 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
                                       fillColor: AppTheme.surfaceVariant,
                                       contentPadding:
                                           const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 10,
+                                            horizontal: 12,
+                                            vertical: 12,
                                           ),
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(10),
                                         borderSide: BorderSide.none,
                                       ),
                                     ),
@@ -385,31 +313,32 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
                                     ],
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 14,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 2.0,
                                     ),
                                     decoration: InputDecoration(
-                                      labelText: '6-Digit Code',
+                                      labelText: '6-Digit Pairing PIN',
                                       labelStyle: const TextStyle(
                                         color: AppTheme.textSecondary,
                                         fontSize: 11,
+                                        letterSpacing: 0,
                                       ),
                                       hintText: '123456',
                                       hintStyle: const TextStyle(
                                         color: AppTheme.textMuted,
-                                        fontSize: 12,
+                                        fontSize: 14,
                                         letterSpacing: 0,
                                       ),
                                       filled: true,
                                       fillColor: AppTheme.surfaceVariant,
                                       contentPadding:
                                           const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 10,
+                                            horizontal: 12,
+                                            vertical: 12,
                                           ),
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(10),
                                         borderSide: BorderSide.none,
                                       ),
                                     ),
@@ -421,7 +350,7 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
                             const SizedBox(height: 10),
                             SizedBox(
                               width: double.infinity,
-                              height: 38,
+                              height: 42,
                               child: ElevatedButton.icon(
                                 onPressed: _isPairingKadb
                                     ? null
@@ -436,42 +365,131 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
                                         ),
                                       )
                                     : const Icon(
-                                        Icons.wifi_tethering_rounded,
-                                        size: 16,
+                                        Icons.link_rounded,
+                                        size: 18,
                                       ),
                                 label: Text(
                                   _isPairingKadb
-                                      ? 'Pairing...'
-                                      : 'Pair Manually in App',
+                                      ? 'Pairing with localhost...'
+                                      : 'Pair & Connect',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                    fontSize: 13,
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.surfaceVariant,
-                                  foregroundColor: Colors.white,
-                                  side: const BorderSide(
-                                    color: AppTheme.surfaceBorder,
-                                  ),
+                                  backgroundColor: AppTheme.accentGreen,
+                                  foregroundColor: Colors.black,
+                                  elevation: 0,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                               ),
                             ),
                             if (_kadbMessage != null) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                _kadbMessage!,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: _kadbMessage!.startsWith('✓')
-                                      ? AppTheme.accentGreen
-                                      : AppTheme.crimson,
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: (_kadbMessage!.startsWith('✓')
+                                          ? AppTheme.accentGreen
+                                          : AppTheme.crimson)
+                                      .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  _kadbMessage!,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: _kadbMessage!.startsWith('✓')
+                                        ? AppTheme.accentGreen
+                                        : AppTheme.crimson,
+                                  ),
                                 ),
                               ),
                             ],
+                            const SizedBox(height: 16),
+                            Divider(color: AppTheme.surfaceBorder, height: 1),
+                            const SizedBox(height: 14),
+                            // Quick Instructions & Direct Android Settings Link
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppTheme.surfaceBorder,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.help_outline_rounded,
+                                        color: AppTheme.chargingCyan,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _discoveredPort > 0
+                                              ? 'Port Auto-Detected: $_discoveredPort'
+                                              : 'How to find your Pairing Code & Port',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    '1. Open Wireless Debugging in Developer Options.\n2. Tap "Pair device with pairing code".\n3. Enter the 6-digit code (PIN) and port into the fields above.',
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 11,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 36,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () => _telemetryService
+                                          .openWirelessDebuggingSettings(),
+                                      icon: const Icon(
+                                        Icons.open_in_new_rounded,
+                                        size: 14,
+                                      ),
+                                      label: const Text(
+                                        'Open Wireless Debugging Settings',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppTheme.chargingCyan,
+                                        side: BorderSide(
+                                          color: AppTheme.chargingCyan
+                                              .withValues(alpha: 0.4),
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -589,7 +607,6 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
