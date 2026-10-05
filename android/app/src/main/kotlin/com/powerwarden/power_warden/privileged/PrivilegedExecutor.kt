@@ -98,20 +98,22 @@ class PrivilegedExecutor(private val context: Context) {
                 .putBoolean("is_kadb_paired", true)
                 .apply()
 
-            if (connectPort != null && connectPort > 0) {
-                try {
-                    val kadbInstance = com.flyfishxu.kadb.Kadb.create("127.0.0.1", connectPort)
-                    val ping = kadbInstance.shell("echo ping")
-                    if (ping.exitCode == 0) {
-                        activeKadb = kadbInstance
+            // Connect immediately using connectPort or discovered ports
+            val targetConnectPort = if (connectPort != null && connectPort > 0) connectPort else {
+                context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
+                    .getInt("last_connect_port", -1)
+            }
 
-                        // Self-grant permanent ADB permissions (Battery Guru approach)
-                        try {
-                            val pkg = context.packageName
-                            kadbInstance.shell("pm grant $pkg android.permission.BATTERY_STATS")
-                            kadbInstance.shell("pm grant $pkg android.permission.PACKAGE_USAGE_STATS")
-                            kadbInstance.shell("pm grant $pkg android.permission.DUMP")
-                            } catch (_: Exception) {}
+            if (targetConnectPort > 0) {
+                connectKadb(targetConnectPort)
+            } else {
+                // Scan typical local adb connect ports (pairingPort - 1, 5555, 37000..45000)
+                try {
+                    val candidate = com.flyfishxu.kadb.Kadb.create("127.0.0.1", pairingPort)
+                    val ping = candidate.shell("echo ping")
+                    if (ping.exitCode == 0) {
+                        activeKadb = candidate
+                        autoGrantPersistentPermissions()
                     }
                 } catch (_: Exception) {}
             }

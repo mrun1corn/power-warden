@@ -193,7 +193,7 @@ class MainActivity : FlutterActivity() {
                 "getElevatedBackendStatus" -> {
                     val hasShizuku = privilegedExecutor.isShizukuAvailable()
                     val hasPerm = privilegedExecutor.hasShizukuPermission()
-                    val hasKadb = privilegedExecutor.hasKadbConnected()
+                    val hasKadb = privilegedExecutor.hasKadbConnected() || privilegedExecutor.isKadbPaired()
                     val hasPermAdb = privilegedExecutor.hasPermanentAdbPermissions()
                     val statusMap = mapOf(
                         "hasShizuku" to hasShizuku,
