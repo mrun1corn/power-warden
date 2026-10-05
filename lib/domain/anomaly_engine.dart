@@ -30,7 +30,11 @@ class AnomalyEngine {
   /// Dynamically calibrated for real Android hardware:
   /// - SCREEN ON: 300-800mA is normal usage. Heavy games/video can hit 900-1400mA.
   /// - SCREEN OFF: Should be resting idle (15-60mA). Sustained drain >250mA asleep is a rogue wakelock!
-  AnomalyIncident? evaluateSample(TelemetrySample sample) {
+  AnomalyIncident? evaluateSample(
+    TelemetrySample sample, {
+    Map<String, dynamic>? differentialDiagnostics,
+    Map<String, dynamic>? topProcess,
+  }) {
     if (sample.isCharging) {
       _recentSamples.clear();
       return null;
@@ -57,13 +61,43 @@ class AnomalyEngine {
           // Critical sleep drain: Screen off but drawing 550mA+ or heating up
           final isCriticalSleep = peakMa >= 550 || maxTemp >= 38.0;
 
+          // Automated Rulebook Translation (PLANS Phase 3.3)
+          String diagnosis = 'Rogue sleep drain ($peakMa mA while screen off). An app or wakelock is preventing deep sleep.';
+          String recommendedAction = 'Check active app energy list';
+          String? culpritPackage = topProcess?['packageName'] as String?;
+          String? culpritThread = topProcess?['name'] as String?;
+
+          final wakelockDump = (differentialDiagnostics?['wakelocks'] as String?) ?? '';
+          final topOutput = (differentialDiagnostics?['snapshot2'] as String?) ?? '';
+
+          if (wakelockDump.contains('AudioMix')) {
+            diagnosis = 'Audio hardware lock (AudioMix) not released while display is asleep.';
+            recommendedAction = 'Force stop media player or background audio';
+            culpritThread = 'AudioMix';
+          } else if (topOutput.contains('CpuTracker') || topOutput.contains('system_server')) {
+            diagnosis = 'Android system IPC contention loop in system_server.';
+            recommendedAction = 'Device reboot recommended';
+            culpritPackage = 'system_server';
+            culpritThread = 'CpuTracker';
+          } else if (topOutput.contains('GcmService') || topOutput.contains('com.google.android.gms')) {
+            diagnosis = 'Google Play Services sync retry loop due to network/push contention.';
+            recommendedAction = 'Toggle Airplane mode or clear Play Services cache';
+            culpritPackage = 'com.google.android.gms';
+            culpritThread = 'GcmService';
+          } else if (culpritThread != null && culpritThread.isNotEmpty) {
+            diagnosis = 'High background CPU activity detected from $culpritThread ($peakMa mA).';
+            recommendedAction = 'Tap Force Stop to tame application';
+          }
+
           return AnomalyIncident(
             startTime: window.first.timestamp,
             severity: isCriticalSleep ? AnomalySeverity.critical : AnomalySeverity.moderate,
             peakCurrentMa: peakMa,
             maxTemperatureCelsius: maxTemp,
-            diagnosis: 'Rogue sleep drain ($peakMa mA while screen off). An app or wakelock is preventing deep sleep.',
-            recommendedAction: 'Check active app energy list',
+            culpritPackage: culpritPackage,
+            culpritThread: culpritThread,
+            diagnosis: diagnosis,
+            recommendedAction: recommendedAction,
           );
         }
       }
@@ -79,7 +113,8 @@ class AnomalyEngine {
         severity: AnomalySeverity.critical,
         peakCurrentMa: sample.currentMilliamps,
         maxTemperatureCelsius: sample.temperatureCelsius,
-        culpritThread: 'Thermal Runaway Loop',
+        culpritPackage: topProcess?['packageName'] as String?,
+        culpritThread: topProcess?['name'] as String? ?? 'Thermal Runaway Loop',
         diagnosis: 'Severe active discharge (${sample.currentMilliamps} mA) with device overheating (${sample.temperatureCelsius}°C).',
         recommendedAction: 'Inspect heavy 3D/CPU tasks or reboot',
       );

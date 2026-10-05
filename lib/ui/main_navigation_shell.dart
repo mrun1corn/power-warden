@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'dashboard_screen.dart';
+import 'engine_screen.dart';
 import 'history_screen.dart';
 import 'theme.dart';
 
@@ -19,6 +20,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   final List<Widget> _screens = const [
     DashboardScreen(),
     HistoryScreen(),
+    EngineScreen(),
   ];
 
   @override
@@ -84,6 +86,19 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 size: 22,
               ),
               label: 'History',
+            ),
+            NavigationDestination(
+              icon: Icon(
+                Icons.settings_outlined,
+                color: isDark ? AppTheme.textMuted : AppTheme.textMutedLight,
+                size: 22,
+              ),
+              selectedIcon: const Icon(
+                Icons.settings_rounded,
+                color: AppTheme.accentGreen,
+                size: 22,
+              ),
+              label: 'Engine',
             ),
           ],
         ),

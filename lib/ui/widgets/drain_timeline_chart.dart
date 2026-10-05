@@ -182,6 +182,30 @@ class DrainTimelineChart extends StatelessWidget {
                     ),
                   ),
                   borderData: FlBorderData(show: false),
+                  lineTouchData: LineTouchData(
+                    enabled: true,
+                    handleBuiltInTouches: true,
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) =>
+                          isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+                      tooltipBorder: BorderSide(color: surfaceBorder),
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          final idx = spot.x.toInt().clamp(0, samples.length - 1);
+                          final s = samples[idx];
+                          final screenLabel = s.isScreenOn ? 'Screen On' : 'Asleep';
+                          return LineTooltipItem(
+                            '${spot.y.toInt()} mA (${s.batteryLevel}%)\n${s.temperatureCelsius.toStringAsFixed(1)}°C • $screenLabel',
+                            TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
                   lineBarsData: [
                     LineChartBarData(
                       spots: currentSpots,

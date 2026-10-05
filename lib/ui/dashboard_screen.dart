@@ -110,10 +110,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         _database.bufferSample(sample);
 
-        final incident = _anomalyEngine.evaluateSample(sample);
+        final incident = _anomalyEngine.evaluateSample(
+          sample,
+          topProcess: _topProcesses.isNotEmpty ? _topProcesses.first : null,
+        );
         if (incident != null) {
           _incidents.insert(0, incident);
           _database.recordAnomaly(incident);
+
+          // Trigger differential snapshotting if elevated access is active
+          if (_elevatedStatus['hasAnyElevatedAccess'] == true) {
+            _telemetryService.runDeltaDiagnostics();
+          }
 
           if (_anomalyEngine.shouldAlertNotification(incident)) {
             final topApp = _topProcesses.isNotEmpty

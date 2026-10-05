@@ -41,6 +41,7 @@ class AppDatabase {
     _sessionsFile = File(p.join(dbDir.path, 'power_sessions.jsonl'));
 
     startPeriodicTasks();
+    await pruneOldTelemetry();
   }
 
   void startPeriodicTasks() {
