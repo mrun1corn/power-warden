@@ -41,10 +41,11 @@ class PairingNotificationHelper(private val context: Context) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Wireless Debugging Helper",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Enter pairing code directly from the notification"
-                setShowBadge(false)
+                setShowBadge(true)
+                enableVibration(true)
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -58,7 +59,33 @@ class PairingNotificationHelper(private val context: Context) {
                 .apply()
         }
 
-        val portText = if (discoveredPort != null) "Detected Port: $discoveredPort" else "Searching for port via mDNS..."
+        // Direct Reply RemoteInput setup
+        val remoteInput = RemoteInput.Builder(KEY_PAIRING_CODE)
+            .setLabel("Enter 6-digit code")
+            .build()
+
+        val replyIntent = Intent(context, CodeReceiver::class.java).apply {
+            action = ACTION_CODE_SUBMITTED
+            if (discoveredPort != null && discoveredPort > 0) {
+                putExtra("discovered_pairing_port", discoveredPort)
+            }
+        }
+        val replyPendingIntent = PendingIntent.getBroadcast(
+            context,
+            1004,
+            replyIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+        )
+
+        val replyAction = NotificationCompat.Action.Builder(
+            android.R.drawable.ic_input_add,
+            "Enter Pairing Code",
+            replyPendingIntent
+        ).addRemoteInput(remoteInput).build()
 
         val openSettingsIntent = Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -70,16 +97,17 @@ class PairingNotificationHelper(private val context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         )
 
-        val portShort = if (discoveredPort != null) "Port: $discoveredPort" else "Waiting for port..."
+        val portShort = if (discoveredPort != null && discoveredPort > 0) "Port: $discoveredPort" else "Waiting for port..."
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Wireless ADB Pairing Helper")
-            .setContentText("$portShort · Tap to enter pairing code")
+            .setContentTitle("Wireless ADB Pairing Active")
+            .setContentText("$portShort · Tap 'Enter Code' below")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setOnlyAlertOnce(true)
-            .setOngoing(false)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(true)
+            .setAutoCancel(false)
             .setContentIntent(openSettingsPending)
+            .addAction(replyAction)
             .addAction(android.R.drawable.ic_menu_preferences, "Open Settings", openSettingsPending)
             .build()
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/database/database.dart';
+import '../../main.dart';
 import '../../services/telemetry_service.dart';
 import 'theme.dart';
 import 'widgets/wireless_pairing_sheet.dart';
@@ -75,10 +76,22 @@ class _EngineScreenState extends State<EngineScreen> {
       backgroundColor: isDark ? AppTheme.pureOledBackground : AppTheme.lightBackground,
       appBar: AppBar(
         title: Text(
-          'Engine & Privileges',
+          'Engine & Settings',
           style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+              size: 20,
+            ),
+            tooltip: 'Toggle Theme',
+            onPressed: () async {
+              final newMode = isDark ? ThemeMode.light : ThemeMode.dark;
+              PowerWardenApp.themeModeNotifier.value = newMode;
+              await _telemetryService.setPrefBool('is_light_mode', isDark);
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadState,

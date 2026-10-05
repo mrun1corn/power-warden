@@ -39,6 +39,19 @@ class PrivilegedExecutor(private val context: Context) {
             method.isAccessible = true
             shizukuNewProcessMethod = method
         } catch (_: Exception) {}
+
+        // Fallback resolution using Shizuku.newProcess public API
+        if (shizukuNewProcessMethod == null) {
+            try {
+                val method = Shizuku::class.java.getMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                )
+                shizukuNewProcessMethod = method
+            } catch (_: Exception) {}
+        }
     }
 
     /**
@@ -175,14 +188,33 @@ class PrivilegedExecutor(private val context: Context) {
      */
     suspend fun executeCommand(command: String): ExecutionResult = withContext(Dispatchers.IO) {
         try {
-            if (isShizukuAvailable() && hasShizukuPermission() && shizukuNewProcessMethod != null) {
-                val process = shizukuNewProcessMethod!!.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
-                val stdout = process.inputStream.bufferedReader().use(BufferedReader::readText)
-                val stderr = process.errorStream.bufferedReader().use(BufferedReader::readText)
-                val exitCode = process.waitFor()
-                return@withContext ExecutionResult(exitCode, stdout.trim(), stderr.trim(), exitCode == 0)
+            // Priority 1: Shizuku binder shell
+            if (isShizukuAvailable() && hasShizukuPermission()) {
+                val proc = try {
+                    if (shizukuNewProcessMethod == null) {
+                        val m = Shizuku::class.java.getDeclaredMethod(
+                            "newProcess",
+                            Array<String>::class.java,
+                            Array<String>::class.java,
+                            String::class.java
+                        )
+                        m.isAccessible = true
+                        shizukuNewProcessMethod = m
+                    }
+                    shizukuNewProcessMethod?.invoke(null, arrayOf("sh", "-c", command), null, null) as? Process
+                } catch (_: Exception) {
+                    null
+                }
+
+                if (proc != null) {
+                    val stdout = proc.inputStream.bufferedReader().use(BufferedReader::readText)
+                    val stderr = proc.errorStream.bufferedReader().use(BufferedReader::readText)
+                    val exitCode = proc.waitFor()
+                    return@withContext ExecutionResult(exitCode, stdout.trim(), stderr.trim(), exitCode == 0)
+                }
             }
 
+            // Priority 2: Kadb on-device wireless debugging socket fallback
             if (activeKadb != null) {
                 try {
                     val resp = activeKadb!!.shell(command)
@@ -190,6 +222,7 @@ class PrivilegedExecutor(private val context: Context) {
                 } catch (_: Exception) {}
             }
 
+            // Priority 3: Standard unprivileged Android process shell
             val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
             val stdout = process.inputStream.bufferedReader().use(BufferedReader::readText)
             val stderr = process.errorStream.bufferedReader().use(BufferedReader::readText)
@@ -582,7 +615,7 @@ class PrivilegedExecutor(private val context: Context) {
         }
 
         // Must have verified elevated privilege: Shizuku or active Kadb session
-        val hasShizukuElevated = isShizukuAvailable() && hasShizukuPermission() && shizukuNewProcessMethod != null
+        val hasShizukuElevated = isShizukuAvailable() && hasShizukuPermission()
         val hasKadbElevated = activeKadb != null
 
         if (!hasShizukuElevated && !hasKadbElevated) {

@@ -8,10 +8,8 @@ import '../domain/models/anomaly_incident.dart';
 import '../domain/models/power_session.dart';
 import '../domain/models/telemetry_sample.dart';
 import '../data/database/database.dart';
-import '../main.dart';
 import '../services/notification_service.dart';
 import '../services/telemetry_service.dart';
-import 'history_screen.dart';
 import 'theme.dart';
 import 'widgets/drain_timeline_chart.dart';
 import 'widgets/wireless_pairing_sheet.dart';
@@ -454,42 +452,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          // Theme Toggle Button (Pure OLED Black vs Clean Light Mode)
-          IconButton(
-            icon: Icon(
-              Theme.of(context).brightness == Brightness.dark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
-              size: 20,
-            ),
-            tooltip: 'Toggle Theme',
-            onPressed: () async {
-              final isCurrentlyDark =
-                  Theme.of(context).brightness == Brightness.dark;
-              final newMode = isCurrentlyDark
-                  ? ThemeMode.light
-                  : ThemeMode.dark;
-              PowerWardenApp.themeModeNotifier.value = newMode;
-              await _telemetryService.setPrefBool(
-                'is_light_mode',
-                isCurrentlyDark,
-              );
-            },
-          ),
-
-          // Power History Screen Button
-          IconButton(
-            icon: const Icon(Icons.history_rounded, size: 22),
-            tooltip: 'Power History',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const HistoryScreen()),
-              );
-            },
-          ),
-
-          // Only show settings/pairing icon if elevated access is NOT granted yet
+          // Only show pairing warning icon if elevated access is NOT granted yet
           if (_elevatedStatus['hasAnyElevatedAccess'] != true)
             IconButton(
               icon: const Icon(
@@ -500,7 +463,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: _showPairingModal,
               tooltip: 'Set Up Permissions',
             ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
         ],
       ),
       body: sample == null
