@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'services/telemetry_service.dart';
 import 'ui/dashboard_screen.dart';
+import 'ui/main_navigation_shell.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
 
@@ -100,7 +101,7 @@ class _PowerWardenAppState extends State<PowerWardenApp> {
                   ),
                 )
               : _hasCompletedSetup
-              ? const DashboardScreen()
+              ? const MainNavigationShell()
               : SetupScreen(
                   onSetupComplete: () {
                     setState(() => _hasCompletedSetup = true);

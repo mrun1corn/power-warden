@@ -213,108 +213,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _checkElevatedWarning() async {
-    // Never show warning popup if user already has elevated access or permanent ADB granted!
-    if (_elevatedStatus['hasAnyElevatedAccess'] == true) return;
-
-    final hasPrompted = await _telemetryService.getPrefBool(
-      'has_prompted_unpaired_warning',
-      defaultValue: false,
-    );
-    if (!hasPrompted && mounted) {
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
-      _showUnpairedWarningDialog();
-    }
-  }
-
-  void _showUnpairedWarningDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: AppTheme.amber.withValues(alpha: 0.4),
-            width: 1,
-          ),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.amber.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.warning_amber_rounded,
-                color: AppTheme.amber,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Privileges Needed',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: const Text(
-          'PowerWarden is currently running in baseline mode.\n\nWithout Shizuku or Wireless ADB pairing, Android prevents the app from identifying other background processes or force-stopping runaway battery drains.',
-          style: TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 13,
-            height: 1.45,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await _telemetryService.setPrefBool(
-                'has_prompted_unpaired_warning',
-                true,
-              );
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text(
-              'Remind Later',
-              style: TextStyle(color: AppTheme.textMuted),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await _telemetryService.setPrefBool(
-                'has_prompted_unpaired_warning',
-                true,
-              );
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
-                _showPairingModal();
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.amber,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              elevation: 0,
-            ),
-            child: const Text(
-              'Pair Now',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
+    // Suppressed: Using inline non-intrusive banner instead of modal dialog
+    return;
   }
 
   @override
@@ -333,6 +233,161 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _isLoadingProcesses = false;
       });
     }
+  }
+
+  void _confirmAndRemediate(String name, String pkg) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(
+              color: isDark
+                  ? AppTheme.surfaceBorderDark
+                  : AppTheme.surfaceBorderLight,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppTheme.surfaceBorderDark
+                        : AppTheme.surfaceBorderLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: AppTheme.crimson.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.bolt_rounded,
+                      color: AppTheme.crimson,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Force Stop $name?',
+                          style: TextStyle(
+                            color: isDark ? Colors.white : AppTheme.textPrimaryLight,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          pkg,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: isDark ? AppTheme.textMuted : AppTheme.textMutedLight,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'This will kill the app process and release its background CPU threads and wakelocks.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: isDark ? AppTheme.textSecondary : AppTheme.textSecondaryLight,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isDark ? Colors.white : Colors.black,
+                        side: BorderSide(
+                          color: isDark
+                              ? AppTheme.surfaceBorderDark
+                              : AppTheme.surfaceBorderLight,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final messenger = ScaffoldMessenger.of(context);
+                        final ok = await _telemetryService.remediateApp(pkg);
+                        if (!mounted) return;
+                        if (ok) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('✓ Force-stopped $name'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                          _loadProcesses();
+                        } else {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Please tap "Force Stop" in $name system settings',
+                              ),
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.crimson,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Force Stop',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showPairingModal() {
@@ -469,6 +524,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 12),
                   ],
 
+                  // Inline Non-Intrusive Privilege Banner (shown only when unprivileged)
+                  if (_elevatedStatus['hasAnyElevatedAccess'] != true) ...[
+                    _buildInlinePrivilegeBanner(),
+                    const SizedBox(height: 12),
+                  ],
+
                   // Unified Minimal Command Card (Battery Status + Instant Telemetry Strip)
                   _buildUnifiedCommandCard(
                     sample,
@@ -496,6 +557,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildInlinePrivilegeBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.amber.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.amber.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppTheme.amber.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.shield_outlined,
+              color: AppTheme.amber,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Baseline Sensor Mode Active',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Link Shizuku or Wireless ADB for deep thread inspection & 1-tap kill.',
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: _showPairingModal,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.amber,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: const Size(60, 32),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Pair',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -808,32 +942,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                onTap: () async {
-                                  final messenger = ScaffoldMessenger.of(
-                                    context,
-                                  );
-                                  final ok = await _telemetryService
-                                      .remediateApp(pkg);
-                                  if (!mounted) return;
-                                  if (ok) {
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text('✓ Force-stopped $name'),
-                                        duration: const Duration(seconds: 2),
-                                      ),
-                                    );
-                                    _loadProcesses();
-                                  } else {
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Please tap "Force Stop" in $name system settings',
-                                        ),
-                                        duration: const Duration(seconds: 3),
-                                      ),
-                                    );
-                                  }
-                                },
+                                onTap: () => _confirmAndRemediate(name, pkg),
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
                                   constraints: const BoxConstraints(

@@ -53,3 +53,5 @@ android/gradle-[0-9]*/
 android/bin/
 android/lib/
 android/init.d/
+android/LICENSE
+android/README
