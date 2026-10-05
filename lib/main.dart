@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'services/telemetry_service.dart';
-import 'ui/dashboard_screen.dart';
 import 'ui/main_navigation_shell.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
