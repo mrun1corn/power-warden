@@ -447,7 +447,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           : RefreshIndicator(
               onRefresh: () async {
                 final s = await _telemetryService.getInstantMetrics();
-                setState(() => _currentSample = s);
+                await _loadProcesses();
+                final elevated = await _telemetryService.getElevatedStatus();
+                if (mounted) {
+                  setState(() {
+                    _currentSample = s;
+                    _elevatedStatus = elevated;
+                  });
+                }
               },
               child: ListView(
                 padding: const EdgeInsets.symmetric(
@@ -965,25 +972,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final level = sample.batteryLevel;
     final absMa = sample.currentMilliamps.abs();
-    final hoursRemaining = isCharging ? 0.8 : (level * 0.22);
+    final bool isScreenOn = sample.isScreenOn;
+
+    // Dynamic hours left and hourly burn velocity
+    final double hoursRemaining;
+    if (isCharging) {
+      final neededMah = ((100 - level) / 100.0) * 4500.0;
+      hoursRemaining = math.max(0.1, neededMah / math.max(absMa.toDouble(), 400.0));
+    } else {
+      final remainingMah = (level / 100.0) * 4500.0;
+      hoursRemaining = math.max(0.5, remainingMah / math.max(absMa.toDouble(), 180.0));
+    }
+    final burnRatePerHour = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
 
     final Color statusColor;
     final String statusBadge;
     if (isCharging) {
       statusColor = isDark ? AppTheme.chargingCyan : AppTheme.chargingCyanLight;
       statusBadge = 'CHARGING';
-    } else if (absMa > 1200) {
-      statusColor = isDark ? AppTheme.crimson : AppTheme.crimsonLight;
-      statusBadge = 'CRITICAL DRAIN';
-    } else if (absMa > 850) {
-      statusColor = isDark ? AppTheme.amber : AppTheme.amberLight;
-      statusBadge = 'HEAVY LOAD';
-    } else if (absMa > 300) {
-      statusColor = isDark ? AppTheme.amber : AppTheme.amberLight;
-      statusBadge = 'ACTIVE USE';
+    } else if (!isScreenOn) {
+      // Standby / Screen-off thresholds
+      if (absMa > 350) {
+        statusColor = isDark ? AppTheme.crimson : AppTheme.crimsonLight;
+        statusBadge = 'WAKELOCK DRAIN';
+      } else if (absMa > 150) {
+        statusColor = isDark ? AppTheme.amber : AppTheme.amberLight;
+        statusBadge = 'SLEEP LEAK';
+      } else {
+        statusColor = isDark ? AppTheme.accentGreen : AppTheme.accentGreenLight;
+        statusBadge = 'DEEP SLEEP';
+      }
     } else {
-      statusColor = isDark ? AppTheme.accentGreen : AppTheme.accentGreenLight;
-      statusBadge = 'RESTING IDLE';
+      // Screen ON active display (nominal 400-900mA for 120Hz LTPO panels)
+      if (absMa > 1400 || (absMa > 1200 && sample.temperatureCelsius >= 40.0)) {
+        statusColor = isDark ? AppTheme.crimson : AppTheme.crimsonLight;
+        statusBadge = 'CRITICAL DRAIN';
+      } else if (absMa > 950) {
+        statusColor = isDark ? AppTheme.amber : AppTheme.amberLight;
+        statusBadge = 'HEAVY LOAD';
+      } else {
+        statusColor = isDark ? AppTheme.accentGreen : AppTheme.accentGreenLight;
+        statusBadge = 'NOMINAL';
+      }
     }
 
     final volts = (sample.voltageMv / 1000.0).toStringAsFixed(2);
@@ -1073,7 +1103,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Text(
                             isCharging
                                 ? 'Fast Charging · Full in ~${(hoursRemaining * 60).round()}m'
-                                : 'Battery Healthy · ~${hoursRemaining.toStringAsFixed(1)}h left',
+                                : 'Battery Healthy · ~${hoursRemaining.toStringAsFixed(1)}h left (~$burnRatePerHour%/hr)',
                             style: TextStyle(
                               color: textMuted,
                               fontSize: 12.5,

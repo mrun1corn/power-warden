@@ -42,6 +42,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
   void _finishSetup() async {
     await _telemetryService.setPrefBool('has_completed_setup', true);
+    await _telemetryService.setPrefBool('has_prompted_unpaired_warning', true);
     widget.onSetupComplete();
   }
 

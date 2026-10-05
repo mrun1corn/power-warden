@@ -121,7 +121,11 @@ class PowerWardenService : Service() {
             title = "⚠️ High Discharge: $level% · -$displayMa mA ($percentPerHour%/hr)"
             content = "Heavy battery burn detected · Temp: ${String.format("%.1f", temp)}°C"
         } else {
-            val hoursLeft = String.format("%.1f", level * 0.22)
+            // Dynamic hours left calculation based on live current
+            val activeMa = Math.max(150, displayMa)
+            val nominalCapacityMah = 4500.0
+            val remainingMah = (level / 100.0) * nominalCapacityMah
+            val hoursLeft = String.format("%.1f", remainingMah / activeMa)
             title = "🔋 $level% · -$displayMa mA ($percentPerHour%/hr)"
             content = "About ${hoursLeft}h left · ${String.format("%.1f", temp)}°C · All calm"
         }
@@ -237,7 +241,7 @@ class PowerWardenService : Service() {
     private fun ScreenObserver.isInteractive(): Boolean = this.isScreenOn
 
     private fun sampleMetrics(): Map<String, Any> {
-        val snap = batteryProbe.readInstantaneousSample()
+        val snap = batteryProbe.sampleFilteredMetrics()
         return mapOf(
             "timestamp" to snap.timestampEpochMs,
             "currentMa" to snap.currentMilliamps,
