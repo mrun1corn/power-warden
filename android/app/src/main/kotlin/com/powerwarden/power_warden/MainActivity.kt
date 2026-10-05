@@ -75,6 +75,29 @@ class MainActivity : FlutterActivity() {
         thermalObserver.start()
         screenObserver.start()
 
+        // Shizuku Automatic Self-Grant: Immediately execute persistent ADB grants upon Shizuku authorization
+        try {
+            rikka.shizuku.Shizuku.addBinderReceivedListenerSticky {
+                if (privilegedExecutor.hasShizukuPermission()) {
+                    activityScope.launch {
+                        privilegedExecutor.autoGrantPersistentPermissions()
+                    }
+                }
+            }
+            rikka.shizuku.Shizuku.addRequestPermissionResultListener { _, grantResult ->
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    activityScope.launch {
+                        privilegedExecutor.autoGrantPersistentPermissions()
+                    }
+                }
+            }
+            if (privilegedExecutor.hasShizukuPermission()) {
+                activityScope.launch {
+                    privilegedExecutor.autoGrantPersistentPermissions()
+                }
+            }
+        } catch (_: Exception) {}
+
         // Ensure notification permission on Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {

@@ -151,6 +151,24 @@ class PrivilegedExecutor(private val context: Context) {
         }
     }
 
+    /**
+     * Self-grants persistent Android diagnostic permissions (BATTERY_STATS, PACKAGE_USAGE_STATS, DUMP)
+     * using the elevated shell (Shizuku or Kadb).
+     * Once granted, diagnostics and background telemetry persist even if Shizuku is stopped
+     * or if the device rebooted / Wireless Debugging socket closed.
+     */
+    suspend fun autoGrantPersistentPermissions(): Boolean = withContext(Dispatchers.IO) {
+        val pkg = context.packageName
+        try {
+            executeCommand("pm grant $pkg android.permission.BATTERY_STATS")
+            executeCommand("pm grant $pkg android.permission.PACKAGE_USAGE_STATS")
+            executeCommand("pm grant $pkg android.permission.DUMP")
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun isKadbPaired(): Boolean {
         val prefs = context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
         return prefs.getBoolean("is_kadb_paired", false)

@@ -878,22 +878,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         const SizedBox(width: 8),
 
-                        // Symmetrical Button Cluster: [STATUS] & [STOP] with identical height and border radius
+                        // Symmetrical Button Cluster: [STATUS] & [STOP] with identical height (30dp) and radius (8dp)
                         Row(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // State Indicator Button
+                            // State Indicator Pill
                             Container(
-                              height: 26,
+                              height: 30,
+                              constraints: const BoxConstraints(minWidth: 62),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
+                                horizontal: 9,
                               ),
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: stateColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: stateColor.withValues(alpha: 0.3),
+                                  color: stateColor.withValues(alpha: 0.35),
                                   width: 1,
                                 ),
                               ),
@@ -903,26 +905,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   color: stateColor,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.4,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
 
-                            // Force Stop Action Button (48dp interactive touch target)
+                            // Force Stop Action Button
                             Material(
                               color: Colors.transparent,
                               child: InkWell(
                                 onTap: () => _confirmAndRemediate(name, pkg),
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
-                                  constraints: const BoxConstraints(
-                                    minHeight: 48,
-                                    minWidth: 54,
-                                  ),
+                                  height: 30,
+                                  constraints: const BoxConstraints(minWidth: 58),
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
-                                    vertical: 6,
                                   ),
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
@@ -959,7 +958,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           : (isDark
                                                 ? AppTheme.textSecondary
                                                 : AppTheme.textSecondaryLight),
-                                      fontSize: 11,
+                                      fontSize: 10.5,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.5,
                                     ),

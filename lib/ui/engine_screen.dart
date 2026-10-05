@@ -81,22 +81,11 @@ class _EngineScreenState extends State<EngineScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              size: 20,
-            ),
-            tooltip: 'Toggle Theme',
-            onPressed: () async {
-              final newMode = isDark ? ThemeMode.light : ThemeMode.dark;
-              PowerWardenApp.themeModeNotifier.value = newMode;
-              await _telemetryService.setPrefBool('is_light_mode', isDark);
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadState,
             tooltip: 'Refresh Status',
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
@@ -104,6 +93,64 @@ class _EngineScreenState extends State<EngineScreen> {
           : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               children: [
+                // Section 0: Appearance & Theme
+                _buildSectionHeader('APPEARANCE & DISPLAY THEME', textMuted),
+                const SizedBox(height: 8),
+                _buildCard(
+                  surfaceColor,
+                  surfaceBorder,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (isDark ? AppTheme.accentGreen : AppTheme.chargingCyanLight)
+                              .withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                          size: 20,
+                          color: isDark ? AppTheme.accentGreen : AppTheme.chargingCyanLight,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isDark ? 'Pure OLED Black Theme' : 'Clean Light Mode',
+                              style: TextStyle(
+                                color: textColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isDark
+                                  ? 'True #000000 black saves battery on AMOLED displays'
+                                  : 'High-contrast light interface (WCAG AA compliant)',
+                              style: TextStyle(color: textMuted, fontSize: 11.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch.adaptive(
+                        value: isDark,
+                        activeTrackColor: AppTheme.accentGreen,
+                        onChanged: (val) async {
+                          final newMode = val ? ThemeMode.dark : ThemeMode.light;
+                          PowerWardenApp.themeModeNotifier.value = newMode;
+                          await _telemetryService.setPrefBool('is_light_mode', !val);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
                 // Section 1: Elevated Privilege Status
                 _buildSectionHeader('ELEVATED DIAGNOSTICS ENGINE', textMuted),
                 const SizedBox(height: 8),

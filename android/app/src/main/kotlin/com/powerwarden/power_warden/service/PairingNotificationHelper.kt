@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 class PairingNotificationHelper(private val context: Context) {
 
     companion object {
-        const val CHANNEL_ID = "power_warden_pairing"
+        const val CHANNEL_ID = "power_warden_pairing_headsup_v4"
         const val NOTIFICATION_ID = 9001
         const val ACTION_CODE_SUBMITTED = "com.powerwarden.action.PAIRING_CODE_SUBMITTED"
         const val KEY_PAIRING_CODE = "key_pairing_code"
@@ -38,6 +38,10 @@ class PairingNotificationHelper(private val context: Context) {
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                notificationManager.deleteNotificationChannel("power_warden_pairing")
+            } catch (_: Exception) {}
+
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Wireless Debugging Helper",
@@ -46,6 +50,8 @@ class PairingNotificationHelper(private val context: Context) {
                 description = "Enter pairing code directly from the notification"
                 setShowBadge(true)
                 enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 100, 250)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -61,7 +67,8 @@ class PairingNotificationHelper(private val context: Context) {
 
         // Direct Reply RemoteInput setup
         val remoteInput = RemoteInput.Builder(KEY_PAIRING_CODE)
-            .setLabel("Enter 6-digit code")
+            .setLabel("Enter 6-digit PIN")
+            .setAllowFreeFormInput(true)
             .build()
 
         val replyIntent = Intent(context, CodeReceiver::class.java).apply {
@@ -83,9 +90,12 @@ class PairingNotificationHelper(private val context: Context) {
 
         val replyAction = NotificationCompat.Action.Builder(
             android.R.drawable.ic_input_add,
-            "Enter Pairing Code",
+            "Enter PIN Here",
             replyPendingIntent
-        ).addRemoteInput(remoteInput).build()
+        ).addRemoteInput(remoteInput)
+         .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+         .setShowsUserInterface(false)
+         .build()
 
         val openSettingsIntent = Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -100,15 +110,18 @@ class PairingNotificationHelper(private val context: Context) {
         val portShort = if (discoveredPort != null && discoveredPort > 0) "Port: $discoveredPort" else "Waiting for port..."
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Wireless ADB Pairing Active")
-            .setContentText("$portShort · Tap 'Enter Code' below")
+            .setContentTitle("Wireless ADB Pairing Helper")
+            .setContentText("$portShort · Tap 'Enter PIN Here'")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(false)
             .setContentIntent(openSettingsPending)
             .addAction(replyAction)
-            .addAction(android.R.drawable.ic_menu_preferences, "Open Settings", openSettingsPending)
+            .addAction(android.R.drawable.ic_menu_preferences, "Settings", openSettingsPending)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
