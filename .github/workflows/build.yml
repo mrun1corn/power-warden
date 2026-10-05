@@ -36,5 +36,11 @@ jobs:
       - name: Run Unit Tests
         run: flutter test
 
-      - name: Build Android APK
-        run: flutter build apk --debug
+      - name: Build Android Release Split APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: power-warden-apks
+          path: build/app/outputs/flutter-apk/*.apk

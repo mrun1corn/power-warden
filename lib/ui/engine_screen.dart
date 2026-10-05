@@ -91,6 +91,115 @@ class _EngineScreenState extends State<EngineScreen> {
     ).then((_) => _loadState());
   }
 
+  void _showVendorAutostartModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.surfaceBorderDark : AppTheme.surfaceBorderLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Icon(Icons.shield_moon_rounded, color: AppTheme.chargingCyan, size: 22),
+                  const SizedBox(width: 10),
+                  Text(
+                    'OEM Autostart & Killer Defense',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppTheme.textPrimaryLight,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Aggressive OEM skins terminate background foreground services unless manually exempted in system security center:',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: isDark ? AppTheme.textSecondary : AppTheme.textSecondaryLight,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _buildOemTile(
+                brand: 'Xiaomi / Redmi / POCO (HyperOS & MIUI)',
+                desc: 'Security App → Manage Apps → PowerWarden → Autostart: ON & Battery Saver: No Restrictions',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 8),
+              _buildOemTile(
+                brand: 'Samsung (OneUI)',
+                desc: 'Device Care → Battery → Background usage limits → Never sleeping apps → Add PowerWarden',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 8),
+              _buildOemTile(
+                brand: 'OnePlus / OPPO / Realme (ColorOS / OxygenOS)',
+                desc: 'App Management → PowerWarden → Battery usage → Allow background activity & Auto-launch',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _telemetryService.requestIgnoreBatteryOptimizations();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentGreen,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Open System Battery Optimization Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOemTile({required String brand, required String desc, required bool isDark}) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(brand, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDark ? Colors.white : Colors.black)),
+          const SizedBox(height: 2),
+          Text(desc, style: TextStyle(fontSize: 11, color: isDark ? AppTheme.textMuted : AppTheme.textMutedLight, height: 1.3)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -308,17 +417,35 @@ class _EngineScreenState extends State<EngineScreen> {
                         style: TextStyle(fontSize: 12, color: textMuted, height: 1.35),
                       ),
                       const SizedBox(height: 12),
-                      OutlinedButton(
-                        onPressed: () async {
-                          await _telemetryService.requestIgnoreBatteryOptimizations();
-                          await _loadState();
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: isDark ? Colors.white : Colors.black,
-                          side: BorderSide(color: surfaceBorder),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('Disable OEM Optimization'),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                await _telemetryService.requestIgnoreBatteryOptimizations();
+                                await _loadState();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: isDark ? Colors.white : Colors.black,
+                                side: BorderSide(color: surfaceBorder),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: const Text('Exempt Battery Saver'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _showVendorAutostartModal,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.chargingCyan,
+                                side: BorderSide(color: AppTheme.chargingCyan.withValues(alpha: 0.4)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: const Text('OEM Guides'),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

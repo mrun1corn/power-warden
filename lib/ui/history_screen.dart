@@ -191,6 +191,13 @@ class _HistoryScreenState extends State<HistoryScreen>
     Color textMuted, {
     required bool isChargingTab,
   }) {
+    final activeMatchingSamples = _historicalSamples
+        .where((s) => isChargingTab ? s.isCharging : !s.isCharging)
+        .toList();
+    final isLiveNow = activeMatchingSamples.length >= 2 &&
+        _historicalSamples.isNotEmpty &&
+        (isChargingTab ? _historicalSamples.last.isCharging : !_historicalSamples.last.isCharging);
+
     // Fallback: If no sessions recorded yet, reconstruct session from recent historical samples
     final effectiveSessions = List<PowerSession>.from(sessions);
     if (effectiveSessions.isEmpty && _historicalSamples.isNotEmpty) {
@@ -232,7 +239,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       }
     }
 
-    if (effectiveSessions.isEmpty) {
+    if (effectiveSessions.isEmpty && !isLiveNow) {
       return _buildEmptyState(
         icon: isChargingTab
             ? Icons.battery_charging_full_rounded
@@ -248,11 +255,147 @@ class _HistoryScreenState extends State<HistoryScreen>
       );
     }
 
+    final totalCount = effectiveSessions.length + (isLiveNow ? 1 : 0);
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: effectiveSessions.length,
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        final session = effectiveSessions[index];
+        if (isLiveNow && index == 0) {
+          final first = activeMatchingSamples.first;
+          final last = activeMatchingSamples.last;
+          final delta = (last.batteryLevel - first.batteryLevel).abs();
+          final accentColor = isChargingTab ? AppTheme.chargingCyan : AppTheme.accentGreen;
+          final sign = isChargingTab ? '+' : '-';
+          final duration = DateTime.now().difference(first.timestamp);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: accentColor.withValues(alpha: 0.5), width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isChargingTab ? Icons.flash_on_rounded : Icons.battery_charging_full_rounded,
+                        color: accentColor,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              isChargingTab ? 'Live Charging Session' : 'Live Discharge Session',
+                              style: TextStyle(
+                                color: textColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: accentColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'ACTIVE',
+                                style: TextStyle(
+                                  color: accentColor,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${first.batteryLevel}% → ${last.batteryLevel}% ($sign$delta% Live)',
+                          style: TextStyle(
+                            color: accentColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          PowerFormatters.duration(duration),
+                          style: TextStyle(
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          'Ongoing',
+                          style: TextStyle(color: accentColor, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: surfaceVariant,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStatCol(
+                        'LIVE FLOW',
+                        '$sign${last.currentMilliamps.abs()} mA',
+                        accentColor,
+                      ),
+                      _buildStatCol(
+                        'LIVE POWER',
+                        PowerFormatters.wattage(last.voltageMv, last.currentMilliamps),
+                        textColor,
+                      ),
+                      _buildStatCol(
+                        'THERMAL',
+                        '${last.temperatureCelsius.toStringAsFixed(1)}°C',
+                        textColor,
+                      ),
+                      _buildStatCol(
+                        'VOLTAGE',
+                        '${(last.voltageMv / 1000.0).toStringAsFixed(2)}V',
+                        textColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final sessionIndex = isLiveNow ? index - 1 : index;
+        final session = effectiveSessions[sessionIndex];
         final accentColor = session.isCharging
             ? AppTheme.chargingCyan
             : AppTheme.accentGreen;

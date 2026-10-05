@@ -233,6 +233,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadProcesses() async {
     setState(() => _isLoadingProcesses = true);
     final procs = await _telemetryService.getRunningProcesses();
+    final powerStats = await _telemetryService.getEstimatedAppPowerStats();
+
+    if (powerStats.isNotEmpty) {
+      for (final p in procs) {
+        final pkg = (p['packageName'] as String?) ?? '';
+        final stats = powerStats[pkg];
+        if (stats != null) {
+          p['drainMah'] = stats['totalMah'];
+          p['cpuMah'] = stats['cpuMah'];
+          p['wakeMah'] = stats['wakeMah'];
+          p['wifiMah'] = stats['wifiMah'];
+        }
+      }
+    }
+
     if (mounted) {
       setState(() {
         _topProcesses = procs;
@@ -1035,6 +1050,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ],
                       ],
                     ),
+                    if (proc['drainMah'] != null && (proc['drainMah'] as num) > 0) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: surfaceBorder),
+                            ),
+                            child: Text(
+                              'Total: ${(proc['drainMah'] as num).toStringAsFixed(1)} mAh',
+                              style: TextStyle(color: textMuted, fontSize: 9.5, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          if (proc['cpuMah'] != null && (proc['cpuMah'] as num) > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: surfaceBorder),
+                              ),
+                              child: Text(
+                                'CPU: ${(proc['cpuMah'] as num).toStringAsFixed(1)} mAh',
+                                style: TextStyle(color: textMuted, fontSize: 9.5),
+                              ),
+                            ),
+                          if (proc['wakeMah'] != null && (proc['wakeMah'] as num) > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.amber.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: AppTheme.amber.withValues(alpha: 0.3)),
+                              ),
+                              child: Text(
+                                'Wake: ${(proc['wakeMah'] as num).toStringAsFixed(1)} mAh',
+                                style: const TextStyle(color: AppTheme.amber, fontSize: 9.5, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               );
