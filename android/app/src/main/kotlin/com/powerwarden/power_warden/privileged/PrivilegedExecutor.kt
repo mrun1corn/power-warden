@@ -606,6 +606,58 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     /**
+     * Extracts subsystem power consumption (CPU, Wakelock, Wi-Fi) directly from `dumpsys batterystats`.
+     */
+    suspend fun getEstimatedAppPowerStats(): Map<String, Map<String, Double>> = withContext(Dispatchers.IO) {
+        val resultMap = mutableMapOf<String, Map<String, Double>>()
+        try {
+            val res = executeCommand("dumpsys batterystats --charged")
+            if (res.isSuccess && res.stdout.contains("Estimated power use")) {
+                val lines = res.stdout.lines()
+                var inEstimatedSection = false
+                val uidRegex = Regex("""Uid\s+(\w+)\s*\(([^)]+)\):\s*([\d.]+)(?:\s*\(([^)]+)\))?""")
+
+                for (line in lines) {
+                    if (line.contains("Estimated power use")) {
+                        inEstimatedSection = true
+                        continue
+                    }
+                    if (inEstimatedSection && line.isNotBlank() && !line.startsWith("  ")) {
+                        inEstimatedSection = false
+                        break
+                    }
+                    if (inEstimatedSection) {
+                        val match = uidRegex.find(line)
+                        if (match != null) {
+                            val pkg = match.groupValues[2].trim()
+                            val totalMah = match.groupValues[3].toDoubleOrNull() ?: 0.0
+                            val components = match.groupValues.getOrNull(4) ?: ""
+
+                            var cpuMah = 0.0
+                            var wakeMah = 0.0
+                            var wifiMah = 0.0
+
+                            for (part in components.split(" ")) {
+                                if (part.startsWith("cpu=")) cpuMah = part.substringAfter("cpu=").toDoubleOrNull() ?: 0.0
+                                else if (part.startsWith("wake=")) wakeMah = part.substringAfter("wake=").toDoubleOrNull() ?: 0.0
+                                else if (part.startsWith("wifi=")) wifiMah = part.substringAfter("wifi=").toDoubleOrNull() ?: 0.0
+                            }
+
+                            resultMap[pkg] = mapOf(
+                                "totalMah" to totalMah,
+                                "cpuMah" to cpuMah,
+                                "wakeMah" to wakeMah,
+                                "wifiMah" to wifiMah
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        resultMap
+    }
+
+    /**
      * Differential delta snapshot: Captures top thread stats, waits delayMs, captures second snapshot,
      * and computes CPU tick differential.
      */

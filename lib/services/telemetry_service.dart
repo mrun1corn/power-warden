@@ -131,6 +131,25 @@ class TelemetryService {
     return [];
   }
 
+  /// Retrieves subsystem power consumption (CPU, Wakelock, Wi-Fi) directly from `dumpsys batterystats`.
+  Future<Map<String, Map<String, double>>> getEstimatedAppPowerStats() async {
+    try {
+      final res = await _methodChannel.invokeMethod<Map<dynamic, dynamic>>('getEstimatedAppPowerStats');
+      if (res != null) {
+        final converted = <String, Map<String, double>>{};
+        res.forEach((key, value) {
+          if (value is Map) {
+            converted[key.toString()] = Map<String, double>.from(
+              value.map((k, v) => MapEntry(k.toString(), (v as num).toDouble())),
+            );
+          }
+        });
+        return converted;
+      }
+    } catch (_) {}
+    return {};
+  }
+
   Future<bool> pairKadb(int port, String code) async {
     try {
       final res = await _methodChannel.invokeMethod<bool>('pairKadbLocal', {

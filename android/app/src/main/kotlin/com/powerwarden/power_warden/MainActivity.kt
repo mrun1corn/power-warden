@@ -240,6 +240,12 @@ class MainActivity : FlutterActivity() {
                         result.success(procs)
                     }
                 }
+                "getEstimatedAppPowerStats" -> {
+                    activityScope.launch {
+                        val stats = privilegedExecutor.getEstimatedAppPowerStats()
+                        result.success(stats)
+                    }
+                }
                 "getHistoricalAppUsage" -> {
                     val days = call.argument<Int>("days") ?: 1
                     activityScope.launch {
