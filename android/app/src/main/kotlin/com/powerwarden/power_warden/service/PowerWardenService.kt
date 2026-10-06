@@ -55,11 +55,44 @@ class PowerWardenService : Service() {
         }
     }
 
+    private var sleepStartTimeMs: Long = 0L
+    private var sleepStartLevel: Int = 0
+    private var sleepStartTemp: Double = 0.0
+
     override fun onCreate() {
         super.onCreate()
         batteryProbe = BatteryProbe(this)
         thermalObserver = ThermalObserver(this) {}
-        screenObserver = ScreenObserver(this) { _, _ -> }
+        screenObserver = ScreenObserver(this) { isScreenOn, sleepDurationMs ->
+            // Native Standby Sleep Session Persistence
+            if (!isScreenOn) {
+                // Phone just went to sleep
+                sleepStartTimeMs = System.currentTimeMillis()
+                val snap = batteryProbe.readInstantaneousSample()
+                sleepStartLevel = snap.batteryLevel
+                sleepStartTemp = snap.temperatureCelsius
+            } else if (sleepDurationMs >= 60_000L && sleepStartTimeMs > 0L) {
+                // Phone woke up after resting for >= 1 minute (or whole night)
+                val wakeTime = System.currentTimeMillis()
+                val snap = batteryProbe.readInstantaneousSample()
+                val deltaLevel = Math.abs(snap.batteryLevel - sleepStartLevel)
+                val mahDelta = Math.max(10, ((deltaLevel / 100.0) * 4500.0).toInt())
+
+                recordNativePowerSession(
+                    type = "standby",
+                    startTime = sleepStartTimeMs,
+                    endTime = wakeTime,
+                    startLevel = sleepStartLevel,
+                    endLevel = snap.batteryLevel,
+                    mahDelta = mahDelta,
+                    peakMa = Math.abs(snap.currentMilliamps),
+                    peakWatts = (snap.voltageMillivolts / 1000.0) * (Math.abs(snap.currentMilliamps) / 1000.0),
+                    minTemp = Math.min(sleepStartTemp, snap.temperatureCelsius),
+                    maxTemp = Math.max(sleepStartTemp, snap.temperatureCelsius)
+                )
+                sleepStartTimeMs = 0L
+            }
+        }
 
         thermalObserver.start()
         screenObserver.start()
@@ -71,6 +104,44 @@ class PowerWardenService : Service() {
             addAction(Intent.ACTION_BATTERY_CHANGED)
         }
         registerReceiver(powerConnectionReceiver, filter)
+    }
+
+    private fun recordNativePowerSession(
+        type: String,
+        startTime: Long,
+        endTime: Long,
+        startLevel: Int,
+        endLevel: Int,
+        mahDelta: Int,
+        peakMa: Int,
+        peakWatts: Double,
+        minTemp: Double,
+        maxTemp: Double
+    ) {
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                val dbDir = java.io.File(filesDir.parentFile, "app_flutter/power_warden_data")
+                if (!dbDir.exists()) dbDir.mkdirs()
+                val file = java.io.File(dbDir, "power_sessions.jsonl")
+                val json = org.json.JSONObject().apply {
+                    put("id", System.currentTimeMillis().toString())
+                    put("type", type)
+                    put("startTime", startTime)
+                    put("endTime", endTime)
+                    put("startBatteryLevel", startLevel)
+                    put("endBatteryLevel", endLevel)
+                    put("totalMahDelta", mahDelta)
+                    put("peakMa", peakMa)
+                    put("peakWatts", peakWatts)
+                    put("minTempCelsius", minTemp)
+                    put("maxTempCelsius", maxTemp)
+                    put("screenOnSeconds", 0)
+                    put("screenOffSeconds", (endTime - startTime) / 1000)
+                    put("topAppName", "")
+                }
+                file.appendText(json.toString() + "\n")
+            } catch (_: Exception) {}
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

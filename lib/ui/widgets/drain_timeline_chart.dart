@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -36,11 +38,20 @@ class DrainTimelineChart extends StatelessWidget {
       );
     }
 
-    // Generate spots for current magnitude in mA (always positive to prevent negative plunging spikes)
+    final isCurrentlyCharging = samples.isNotEmpty && samples.last.isCharging;
+    final primaryColor = isCurrentlyCharging ? AppTheme.chargingCyan : AppTheme.accentGreen;
+    final eventTitle = isCurrentlyCharging ? 'CHARGING FLOW TIMELINE' : 'DISCHARGE FLOW TIMELINE';
+    final flowLabel = isCurrentlyCharging ? 'Charge Flow (+mA)' : 'Discharge (-mA)';
+
+    // Filter samples matching current state (charging vs discharging) to prevent mixing previous states
+    final activeEventSamples = samples.where((s) => s.isCharging == isCurrentlyCharging).toList();
+    final effectiveSamples = activeEventSamples.isNotEmpty ? activeEventSamples : samples;
+
+    // Generate spots for current magnitude in mA
     final currentSpots = <FlSpot>[];
-    for (int i = 0; i < samples.length; i++) {
+    for (int i = 0; i < effectiveSamples.length; i++) {
       currentSpots.add(
-        FlSpot(i.toDouble(), samples[i].currentMilliamps.abs().toDouble()),
+        FlSpot(i.toDouble(), effectiveSamples[i].currentMilliamps.abs().toDouble()),
       );
     }
 
@@ -60,14 +71,9 @@ class DrainTimelineChart extends StatelessWidget {
     final chartMinY = (minVal - 60).clamp(0.0, double.infinity);
     final chartMaxY = maxVal + 60;
 
-    final isCurrentlyCharging = samples.isNotEmpty && samples.last.isCharging;
-    final primaryColor = isCurrentlyCharging ? AppTheme.chargingCyan : AppTheme.accentGreen;
-    final eventTitle = isCurrentlyCharging ? 'CHARGING FLOW TIMELINE' : 'DISCHARGE FLOW TIMELINE';
-    final flowLabel = isCurrentlyCharging ? 'Charge Flow (+mA)' : 'Discharge (-mA)';
-
     return Container(
-      height: 240,
-      padding: const EdgeInsets.only(top: 16, bottom: 12, right: 16, left: 4),
+      height: 255,
+      padding: const EdgeInsets.only(top: 16, bottom: 16, right: 16, left: 6),
       decoration: BoxDecoration(
         color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
@@ -140,24 +146,31 @@ class DrainTimelineChart extends StatelessWidget {
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 22,
-                        interval: (samples.length > 20
-                            ? (samples.length / 3.0)
+                        reservedSize: 26,
+                        interval: (effectiveSamples.length > 20
+                            ? (effectiveSamples.length / 3.0)
                             : 10.0),
                         getTitlesWidget: (val, meta) {
                           final idx = val.toInt();
                           if (idx == 0) {
-                            return Text(
-                              '-${(samples.length * 2) ~/ 60}m',
-                              style: TextStyle(color: textMuted, fontSize: 9),
+                            final durationMin = math.max(1, (effectiveSamples.length * 2) ~/ 60);
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 6.0),
+                              child: Text(
+                                '-${durationMin}m',
+                                style: TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.w600),
+                              ),
                             );
-                          } else if (idx >= samples.length - 1) {
-                            return Text(
-                              'Now',
-                              style: TextStyle(
-                                color: textMuted,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
+                          } else if (idx >= effectiveSamples.length - 1) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 6.0),
+                              child: Text(
+                                'Now',
+                                style: TextStyle(
+                                  color: primaryColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             );
                           }

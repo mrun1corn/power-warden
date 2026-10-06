@@ -662,12 +662,15 @@ class _HistoryScreenState extends State<HistoryScreen>
     Color textMuted,
     bool isDark,
   ) {
-    // Filter samples with sleep intervals > 30 seconds
+    // 1. First retrieve all full standby sessions recorded natively or in database
+    final standbySessions = _allSessions.where((s) => s.type == 'standby').toList();
+
+    // 2. Combine with historical telemetry sleep samples
     final sleepSamples = _historicalSamples
         .where((s) => s.sleepDurationMs > (1000 * 30))
         .toList();
 
-    if (sleepSamples.isEmpty) {
+    if (standbySessions.isEmpty && sleepSamples.isEmpty) {
       return _buildEmptyState(
         icon: Icons.nightlight_round,
         title: 'No standby sleep intervals detected yet',
@@ -677,11 +680,154 @@ class _HistoryScreenState extends State<HistoryScreen>
       );
     }
 
+    final totalCount = standbySessions.length + sleepSamples.length;
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: sleepSamples.length,
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        final sample = sleepSamples[index];
+        if (index < standbySessions.length) {
+          final session = standbySessions[index];
+          final absMa = session.peakMa.abs();
+          final idleBurnRate = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
+          final durationLabel = session.formattedDuration;
+          final isOvernight = session.duration.inHours >= 4;
+
+          final Color statusColor;
+          final String statusPill;
+          final String statusDesc;
+          if (absMa < 180) {
+            statusColor = AppTheme.accentGreen;
+            statusPill = 'DEEP SLEEP';
+            statusDesc = 'Optimal deep sleep (suspend)';
+          } else if (absMa < 350) {
+            statusColor = AppTheme.chargingCyan;
+            statusPill = 'LIGHT REST';
+            statusDesc = 'Normal sync & background radios';
+          } else {
+            statusColor = AppTheme.amber;
+            statusPill = 'WAKELOCK LEAK';
+            statusDesc = 'Rogue background wakelock active';
+          }
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: statusColor.withValues(alpha: absMa >= 350 ? 0.4 : 0.2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isOvernight ? Icons.bedtime_rounded : Icons.nightlight_round,
+                        color: statusColor,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isOvernight ? '$durationLabel Overnight Sleep' : '$durationLabel Standby Sleep',
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$statusDesc • -$idleBurnRate%/hr',
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 26,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        statusPill,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: surfaceVariant,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStatCol(
+                        'STANDBY DRAIN',
+                        '-$absMa mA',
+                        statusColor,
+                      ),
+                      _buildStatCol(
+                        'BATTERY DROP',
+                        '${session.startBatteryLevel}% → ${session.endBatteryLevel}%',
+                        textColor,
+                      ),
+                      _buildStatCol(
+                        'THERMAL',
+                        '${session.minTempCelsius.toStringAsFixed(0)}° - ${session.maxTempCelsius.toStringAsFixed(0)}°C',
+                        textColor,
+                      ),
+                      _buildStatCol(
+                        'WOKE UP',
+                        PowerFormatters.relativeTime(session.endTime).split('(').first.trim(),
+                        textMuted,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final sampleIndex = index - standbySessions.length;
+        final sample = sleepSamples[sampleIndex];
         final sleepDuration = Duration(milliseconds: sample.sleepDurationMs);
         final durationLabel = PowerFormatters.duration(sleepDuration);
         final absMa = sample.currentMilliamps.abs();
