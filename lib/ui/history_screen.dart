@@ -367,17 +367,17 @@ class _HistoryScreenState extends State<HistoryScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _buildStatCol(
-                        'LIVE FLOW',
+                        isChargingTab ? 'CHARGER INPUT' : 'CURRENT DRAIN',
                         '$sign${last.currentMilliamps.abs()} mA',
                         accentColor,
                       ),
                       _buildStatCol(
-                        'LIVE POWER',
+                        'CHARGING SPEED',
                         PowerFormatters.wattage(last.voltageMv, last.currentMilliamps),
                         textColor,
                       ),
                       _buildStatCol(
-                        'THERMAL',
+                        'BATTERY TEMP',
                         '${last.temperatureCelsius.toStringAsFixed(1)}°C',
                         textColor,
                       ),
@@ -486,22 +486,22 @@ class _HistoryScreenState extends State<HistoryScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildStatCol(
-                      'ENERGY',
+                      isChargingTab ? 'GAINED' : 'LOST',
                       '$sign${session.totalMahDelta.abs()} mAh',
                       accentColor,
                     ),
                     _buildStatCol(
-                      'PEAK FLOW',
+                      isChargingTab ? 'PEAK SPEED' : 'PEAK DRAIN',
                       '${session.peakMa.abs()} mA',
                       textColor,
                     ),
                     _buildStatCol(
-                      'PEAK POWER',
+                      'CHARGER WATTAGE',
                       '${session.peakWatts.toStringAsFixed(1)}W',
                       textColor,
                     ),
                     _buildStatCol(
-                      'THERMAL',
+                      'TEMP RANGE',
                       '${session.minTempCelsius.toStringAsFixed(0)}° - ${session.maxTempCelsius.toStringAsFixed(0)}°C',
                       textColor,
                     ),

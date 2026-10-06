@@ -1314,14 +1314,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildRibbonItem(
                   icon: Icons.speed_rounded,
                   color: isCharging ? AppTheme.chargingCyan : statusColor,
-                  label: isCharging ? 'CHARGE' : 'CURRENT',
+                  label: isCharging ? 'INPUT FLOW' : 'DRAIN FLOW',
                   value: currentLabel,
                 ),
                 Container(width: 1, height: 26, color: surfaceBorder),
                 _buildRibbonItem(
                   icon: Icons.bolt_rounded,
                   color: isCharging ? AppTheme.chargingCyan : AppTheme.amber,
-                  label: 'POWER',
+                  label: isCharging ? 'CHARGER WATTS' : 'POWER DRAW',
                   value: '${watts}W',
                 ),
                 Container(width: 1, height: 26, color: surfaceBorder),
@@ -1330,14 +1330,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: sample.temperatureCelsius >= 38.0
                       ? AppTheme.amber
                       : AppTheme.accentGreen,
-                  label: 'TEMP',
+                  label: 'BATTERY TEMP',
                   value: '${sample.temperatureCelsius.toStringAsFixed(1)}°C',
                 ),
                 Container(width: 1, height: 26, color: surfaceBorder),
                 _buildRibbonItem(
-                  icon: Icons.battery_charging_full_rounded,
+                  icon: Icons.electric_meter_rounded,
                   color: textMuted,
-                  label: 'VOLTS',
+                  label: 'VOLTAGE',
                   value: '${volts}V',
                 ),
               ],
