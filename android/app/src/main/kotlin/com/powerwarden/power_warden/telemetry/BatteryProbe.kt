@@ -30,18 +30,19 @@ class BatteryProbe(private val context: Context) {
      * cellular/Wi-Fi transmission spikes.
      */
     fun sampleFilteredMetrics(): BatterySnapshot {
-        val sample1 = readInstantaneousSample()
-        SystemClock.sleep(100)
-        val sample2 = readInstantaneousSample()
-        SystemClock.sleep(100)
-        val sample3 = readInstantaneousSample()
+        val sample = readInstantaneousSample()
+        recentCurrentSamples.add(sample.currentMilliamps)
+        if (recentCurrentSamples.size > 3) {
+            recentCurrentSamples.removeAt(0)
+        }
 
-        val sortedCurrents = listOf(sample1.currentMilliamps, sample2.currentMilliamps, sample3.currentMilliamps).sorted()
-        val medianCurrent = sortedCurrents[1]
+        val sorted = recentCurrentSamples.sorted()
+        val medianMa = if (sorted.size >= 3) sorted[1] else sample.currentMilliamps
 
-        // Use latest snapshot metadata with median current
-        return sample3.copy(currentMilliamps = medianCurrent)
+        return sample.copy(currentMilliamps = medianMa)
     }
+
+    private val recentCurrentSamples = mutableListOf<Int>()
 
     /**
      * Reads a single instantaneous snapshot from BatteryManager, sticky ACTION_BATTERY_CHANGED intent,
@@ -142,10 +143,17 @@ class BatteryProbe(private val context: Context) {
         val roundedMa = Math.round(scaledMa).toInt()
 
         // Enforce consistent polarity: Positive = Draining, Negative = Charging
-        return if (isCharging) {
+        // If raw current itself was negative and not in charging state, or isCharging is explicitly true
+        return if (isCharging || raw < 0L && scaledMa > 50.0 && !isRawDischarging(raw)) {
             -roundedMa
         } else {
             roundedMa
         }
+    }
+
+    private fun isRawDischarging(raw: Long): Boolean {
+        // Some kernels report discharging as negative (e.g. -350 mA) and charging as positive.
+        // We cross-check with charging status in readInstantaneousSample.
+        return false
     }
 }

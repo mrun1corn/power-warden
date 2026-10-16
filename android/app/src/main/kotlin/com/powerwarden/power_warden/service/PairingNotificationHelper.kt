@@ -140,7 +140,7 @@ class PairingNotificationHelper(private val context: Context) {
                     val cleanCode = code.trim()
                     val port = intent.getIntExtra("discovered_pairing_port", -1)
 
-                    // Execute pairing even if MainActivity was paused by Developer Options
+                    // Execute pairing in background via goAsync()
                     val pendingResult = goAsync()
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                         try {
@@ -151,15 +151,16 @@ class PairingNotificationHelper(private val context: Context) {
                             }
 
                             if (finalPort > 0) {
-                                executor.pairKadb(finalPort, cleanCode)
-                                val notifMgr = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-                                notifMgr?.cancel(NOTIFICATION_ID)
+                                val ok = executor.pairKadb(finalPort, cleanCode)
+                                if (ok) {
+                                    val notifMgr = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                                    notifMgr?.cancel(NOTIFICATION_ID)
+                                }
                             }
                         } finally {
                             pendingResult.finish()
                         }
                     }
-                    onCodeReceivedListener?.invoke(cleanCode)
                 }
             }
         }

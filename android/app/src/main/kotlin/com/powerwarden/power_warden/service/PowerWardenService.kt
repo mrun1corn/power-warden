@@ -40,6 +40,12 @@ class PowerWardenService : Service() {
         const val ACTION_STOP = "com.powerwarden.action.STOP"
 
         var listener: ((Map<String, Any>) -> Unit)? = null
+
+        fun getDatabaseDir(context: Context): java.io.File {
+            val dir = java.io.File(context.filesDir.parentFile, "app_flutter/power_warden_data")
+            if (!dir.exists()) dir.mkdirs()
+            return dir
+        }
     }
 
     private val powerConnectionReceiver = object : BroadcastReceiver() {
@@ -120,8 +126,7 @@ class PowerWardenService : Service() {
     ) {
         serviceScope.launch(Dispatchers.IO) {
             try {
-                val dbDir = java.io.File(filesDir.parentFile, "app_flutter/power_warden_data")
-                if (!dbDir.exists()) dbDir.mkdirs()
+                val dbDir = getDatabaseDir(applicationContext)
                 val file = java.io.File(dbDir, "power_sessions.jsonl")
                 val json = org.json.JSONObject().apply {
                     put("id", System.currentTimeMillis().toString())
@@ -138,6 +143,28 @@ class PowerWardenService : Service() {
                     put("screenOnSeconds", 0)
                     put("screenOffSeconds", (endTime - startTime) / 1000)
                     put("topAppName", "")
+                }
+                file.appendText(json.toString() + "\n")
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun logNativeTelemetrySample(metrics: Map<String, Any>) {
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                val dbDir = getDatabaseDir(applicationContext)
+                val file = java.io.File(dbDir, "telemetry_samples.jsonl")
+                val json = org.json.JSONObject().apply {
+                    put("timestamp", metrics["timestamp"] ?: System.currentTimeMillis())
+                    put("batteryLevel", metrics["batteryLevel"] ?: 50)
+                    put("currentMilliamps", metrics["currentMa"] ?: 0)
+                    put("temperatureCelsius", metrics["temperatureCelsius"] ?: 30.0)
+                    put("thermalStatus", metrics["thermalStatus"] ?: 0)
+                    put("isScreenOn", metrics["isScreenOn"] ?: true)
+                    put("isCharging", metrics["isCharging"] ?: false)
+                    put("voltageMv", metrics["voltageMv"] ?: 4000)
+                    put("sleepDurationMs", metrics["sleepDurationMs"] ?: 0)
+                    put("refreshRate", metrics["refreshRate"] ?: 60.0)
                 }
                 file.appendText(json.toString() + "\n")
             } catch (_: Exception) {}
@@ -278,6 +305,7 @@ class PowerWardenService : Service() {
     private val tickerRunnable = Runnable {
         serviceScope.launch {
             val metrics = sampleMetrics()
+            logNativeTelemetrySample(metrics)
             withContext(Dispatchers.Main) {
                 listener?.invoke(metrics)
             }

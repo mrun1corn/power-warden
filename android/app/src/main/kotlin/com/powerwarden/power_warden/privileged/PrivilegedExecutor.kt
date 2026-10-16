@@ -107,15 +107,8 @@ class PrivilegedExecutor(private val context: Context) {
             if (targetConnectPort > 0) {
                 connectKadb(targetConnectPort)
             } else {
-                // Scan typical local adb connect ports (pairingPort - 1, 5555, 37000..45000)
-                try {
-                    val candidate = com.flyfishxu.kadb.Kadb.create("127.0.0.1", pairingPort)
-                    val ping = candidate.shell("echo ping")
-                    if (ping.exitCode == 0) {
-                        activeKadb = candidate
-                        autoGrantPersistentPermissions()
-                    }
-                } catch (_: Exception) {}
+                // If connect port not yet known, scan listening local ports from /proc/net/tcp
+                scanAndConnectLocalAdbPort()
             }
             true
         } catch (_: Exception) {
@@ -171,6 +164,61 @@ class PrivilegedExecutor(private val context: Context) {
         }
     }
 
+    /**
+     * Scans /proc/net/tcp and /proc/net/tcp6 for active listening ports (state 0A)
+     * on 127.0.0.1 within Android's dynamic ADB range (30000 - 49999).
+     */
+    suspend fun scanAndConnectLocalAdbPort(): Boolean = withContext(Dispatchers.IO) {
+        val listeningPorts = findListeningTcpPorts()
+        for (port in listeningPorts) {
+            try {
+                val candidate = com.flyfishxu.kadb.Kadb.create("127.0.0.1", port)
+                val resp = candidate.shell("echo ping")
+                if (resp.exitCode == 0) {
+                    activeKadb = candidate
+                    context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("is_kadb_paired", true)
+                        .putInt("last_connect_port", port)
+                        .apply()
+                    autoGrantPersistentPermissions()
+                    return@withContext true
+                }
+            } catch (_: Exception) {}
+        }
+        false
+    }
+
+    private fun findListeningTcpPorts(): List<Int> {
+        val ports = mutableListOf<Int>()
+        val tcpFiles = listOf("/proc/net/tcp", "/proc/net/tcp6")
+        for (filePath in tcpFiles) {
+            try {
+                val file = java.io.File(filePath)
+                if (file.exists() && file.canRead()) {
+                    val lines = file.readLines()
+                    for (line in lines) {
+                        val parts = line.trim().split("\\s+".toRegex())
+                        // Format: sl local_address rem_address st ...
+                        // st == "0A" indicates TCP_LISTEN
+                        if (parts.size >= 4 && parts[3].equals("0A", ignoreCase = true)) {
+                            val localAddr = parts[1]
+                            val colonIdx = localAddr.indexOf(':')
+                            if (colonIdx != -1) {
+                                val portHex = localAddr.substring(colonIdx + 1)
+                                val portInt = portHex.toIntOrNull(16)
+                                if (portInt != null && portInt in 30000..49999 && !ports.contains(portInt)) {
+                                    ports.add(portInt)
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        return ports
+    }
+
     fun isKadbPaired(): Boolean {
         val prefs = context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
         return prefs.getBoolean("is_kadb_paired", false)
@@ -196,10 +244,10 @@ class PrivilegedExecutor(private val context: Context) {
         val lastPort = prefs.getInt("last_connect_port", -1)
 
         if (isPaired && lastPort > 0) {
-            connectKadb(lastPort)
-        } else {
-            false
+            val connected = connectKadb(lastPort)
+            if (connected) return@withContext true
         }
+        scanAndConnectLocalAdbPort()
     }
 
     /**

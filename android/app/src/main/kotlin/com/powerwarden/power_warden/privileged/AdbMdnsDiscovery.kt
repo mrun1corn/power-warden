@@ -31,7 +31,11 @@ class AdbMdnsDiscovery(private val context: Context) {
     private var connectDiscoveryListener: NsdManager.DiscoveryListener? = null
 
     private var isResolving = false
-    private val resolveQueue = mutableListOf<NsdServiceInfo>()
+    private data class QueuedResolve(
+        val serviceInfo: NsdServiceInfo,
+        val onResolved: (Int) -> Unit
+    )
+    private val resolveQueue = mutableListOf<QueuedResolve>()
 
     fun startDiscovery() {
         try {
@@ -116,7 +120,7 @@ class AdbMdnsDiscovery(private val context: Context) {
     @Synchronized
     private fun enqueueResolve(serviceInfo: NsdServiceInfo, onResolved: (Int) -> Unit) {
         if (isResolving) {
-            resolveQueue.add(serviceInfo)
+            resolveQueue.add(QueuedResolve(serviceInfo, onResolved))
             return
         }
 
@@ -145,15 +149,7 @@ class AdbMdnsDiscovery(private val context: Context) {
         isResolving = false
         if (resolveQueue.isNotEmpty()) {
             val next = resolveQueue.removeAt(0)
-            enqueueResolve(next) { port ->
-                if (next.serviceType.contains("_adb-tls-pairing")) {
-                    discoveredPairingPort = port
-                    mainHandler.post { onPairingPortDiscovered?.invoke(port) }
-                } else if (next.serviceType.contains("_adb-tls-connect")) {
-                    discoveredConnectPort = port
-                    mainHandler.post { onConnectPortDiscovered?.invoke(port) }
-                }
-            }
+            enqueueResolve(next.serviceInfo, next.onResolved)
         }
     }
 
@@ -174,5 +170,6 @@ class AdbMdnsDiscovery(private val context: Context) {
         }
         resolveQueue.clear()
         isResolving = false
+        discoveredPairingPort = null
     }
 }

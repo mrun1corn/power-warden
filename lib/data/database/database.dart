@@ -62,7 +62,7 @@ class AppDatabase {
   /// Appends sample to in-memory buffer. Flushes if buffer reaches capacity (5 samples).
   Future<void> bufferSample(TelemetrySample sample) async {
     _memoryBuffer.add(sample);
-    if (_memoryBuffer.length >= 5) {
+    if (_memoryBuffer.length >= 3) {
       await flushBuffer();
     }
   }
