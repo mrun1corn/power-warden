@@ -19,7 +19,7 @@ class PrivilegedExecutor(private val context: Context) {
 
     private companion object {
         const val LOCALHOST = "127.0.0.1"
-        const val ESTIMATED_POWER_MARKER = ESTIMATED_POWER_MARKER
+        const val ESTIMATED_POWER_MARKER = "Estimated power use"
     }
 
     data class ExecutionResult(
