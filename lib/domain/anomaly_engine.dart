@@ -17,7 +17,42 @@ class AnomalyEngine {
   final List<TelemetrySample> _recentSamples = [];
   static const int _consecutiveSpikeThreshold = 2; // 2 ticks = 10s
 
+  // ── Incident deduplication & resolution ─────────────────────────────
+  // One sustained rogue-drain event should produce ONE incident, not one
+  // per detection tick. A new incident of the same category is suppressed
+  // while the previous one is younger than [incidentCooldown]; the previous
+  // incident is closed (endTime set) once drain subsides.
+  static const Duration incidentCooldown = Duration(minutes: 5);
+  AnomalyIncident? _lastSleepIncident;
+  AnomalyIncident? _lastActiveIncident;
+
   double get baselineIdleMa => _baselineIdleMa;
+
+  /// Closes any open incident (drain subsided) — call on every calm sample.
+  AnomalyIncident? resolveOpenIncidents(TelemetrySample sample) {
+    AnomalyIncident? closed;
+    if (_lastSleepIncident != null && _lastSleepIncident!.endTime == null) {
+      final drainSettled = sample.isCharging ||
+          (sample.isScreenOn) ||
+          (sample.currentMilliamps < 280);
+      if (drainSettled) {
+        closed = _lastSleepIncident!.copyWith(endTime: sample.timestamp);
+        _lastSleepIncident = closed;
+      }
+    }
+    if (_lastActiveIncident != null && _lastActiveIncident!.endTime == null) {
+      final settled = sample.currentMilliamps < 1500 ||
+          sample.temperatureCelsius < 42.0;
+      if (settled) {
+        final closedActive =
+            _lastActiveIncident!.copyWith(endTime: sample.timestamp);
+        _lastSleepIncident ??= closedActive;
+        closed ??= closedActive;
+        _lastActiveIncident = closedActive;
+      }
+    }
+    return closed;
+  }
 
   /// Updates baseline idle current using Exponentially Weighted Moving Average (EWMA)
   void updateBaseline(int currentMa, bool isScreenOn, bool isCharging) {
@@ -58,6 +93,21 @@ class AnomalyEngine {
           final peakMa = window.map((s) => s.currentMilliamps).reduce(max);
           final maxTemp = window.map((s) => s.temperatureCelsius).reduce(max);
 
+          // Dedup: suppress re-fire while the previous sleep incident is
+          // younger than the cooldown and still open (same sustained event).
+          final last = _lastSleepIncident;
+          final withinCooldown = last != null &&
+              sample.timestamp.difference(last.startTime) < incidentCooldown;
+          if (withinCooldown && last.endTime == null) {
+            // Same ongoing event — update peak figures silently, no new log.
+            _lastSleepIncident = last.copyWith(
+              peakCurrentMa: peakMa > last.peakCurrentMa ? peakMa : last.peakCurrentMa,
+              maxTemperatureCelsius:
+                  maxTemp > last.maxTemperatureCelsius ? maxTemp : last.maxTemperatureCelsius,
+            );
+            return null;
+          }
+
           // Critical sleep drain: Screen off but drawing 550mA+ or heating up
           final isCriticalSleep = peakMa >= 550 || maxTemp >= 38.0;
 
@@ -89,7 +139,7 @@ class AnomalyEngine {
             recommendedAction = 'Tap Force Stop to tame application';
           }
 
-          return AnomalyIncident(
+          return _lastSleepIncident = AnomalyIncident(
             startTime: window.first.timestamp,
             severity: isCriticalSleep ? AnomalySeverity.critical : AnomalySeverity.moderate,
             peakCurrentMa: peakMa,
@@ -109,7 +159,23 @@ class AnomalyEngine {
     // Strictly require extreme physical draw (>1,600mA) AND dangerous battery temperature (>= 42°C)
     // to avoid false emergency alarms while user is simply using the phone.
     if (sample.currentMilliamps >= 1500 && (sample.thermalStatus >= 2 || sample.temperatureCelsius >= 42.0)) {
-      return AnomalyIncident(
+      // Dedup: one incident per sustained thermal event
+      final last = _lastActiveIncident;
+      final withinCooldown = last != null &&
+          sample.timestamp.difference(last.startTime) < incidentCooldown;
+      if (withinCooldown && last.endTime == null) {
+        _lastActiveIncident = last.copyWith(
+          peakCurrentMa: sample.currentMilliamps > last.peakCurrentMa
+              ? sample.currentMilliamps
+              : last.peakCurrentMa,
+          maxTemperatureCelsius: sample.temperatureCelsius > last.maxTemperatureCelsius
+              ? sample.temperatureCelsius
+              : last.maxTemperatureCelsius,
+        );
+        return null;
+      }
+
+      return _lastActiveIncident = AnomalyIncident(
         startTime: sample.timestamp,
         severity: AnomalySeverity.critical,
         peakCurrentMa: sample.currentMilliamps,

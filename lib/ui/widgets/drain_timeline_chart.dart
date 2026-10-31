@@ -73,7 +73,7 @@ class DrainTimelineChart extends StatelessWidget {
 
     return Container(
       height: 255,
-      padding: const EdgeInsets.only(top: 16, bottom: 16, right: 16, left: 6),
+      padding: const EdgeInsets.only(top: 16, bottom: 16, right: 24, left: 6),
       decoration: BoxDecoration(
         color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
@@ -162,14 +162,20 @@ class DrainTimelineChart extends StatelessWidget {
                               ),
                             );
                           } else if (idx >= effectiveSamples.length - 1) {
+                            // 'Now' label: centered in a fixed-width box so it
+                            // never bleeds past the card's right border.
                             return Padding(
                               padding: const EdgeInsets.only(top: 6.0),
-                              child: Text(
-                                'Now',
-                                style: TextStyle(
-                                  color: primaryColor,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                              child: SizedBox(
+                                width: 44,
+                                child: Text(
+                                  'Now',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: primaryColor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             );

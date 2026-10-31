@@ -2,13 +2,18 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../core/action_guard.dart';
 import '../../core/formatters.dart';
 import '../../data/database/database.dart';
 import '../../domain/models/power_session.dart';
 import '../../domain/models/telemetry_sample.dart';
 import '../../services/telemetry_service.dart';
+import 'session_detail_screen.dart';
 import 'theme.dart';
+
+enum _HistoryRange { day, week, all }
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -24,11 +29,13 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   late TabController _tabController;
   Timer? _autoRefreshTimer;
+  _HistoryRange _range = _HistoryRange.day;
 
   List<PowerSession> _allSessions = [];
   List<Map<String, dynamic>> _appUsageList = [];
   List<TelemetrySample> _historicalSamples = [];
   bool _isLoading = true;
+  int _capacityMah = 4500; // calibrated from CHARGE_COUNTER
 
   @override
   void initState() {
@@ -50,7 +57,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Future<void> _refreshSilently() async {
-    final sessions = await _database.getRecentSessions(limit: 60);
+    final sessions = await _database.getRecentSessions(limit: 200);
     final appUsage = await _telemetryService.getHistoricalAppUsage(days: 1);
     final samples = await _database.getRecentTelemetry(limit: 120);
     if (mounted) {
@@ -63,9 +70,11 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Future<void> _loadAllHistory() async {
-    setState(() => _isLoading = true);
+    // Silent refresh: never blank the screen with a spinner on re-loads.
+    // The initial load shows the spinner via _isLoading only when empty.
     await _database.initialize();
-    final sessions = await _database.getRecentSessions(limit: 60);
+    _capacityMah = await _telemetryService.getCapacityMah();
+    final sessions = await _database.getRecentSessions(limit: 200);
     final appUsage = await _telemetryService.getHistoricalAppUsage(days: 1);
     final samples = await _database.getRecentTelemetry(limit: 120);
 
@@ -77,6 +86,41 @@ class _HistoryScreenState extends State<HistoryScreen>
         _isLoading = false;
       });
     }
+  }
+
+  /// Filters sessions by the selected aggregation range.
+  List<PowerSession> _rangeFiltered(List<PowerSession> sessions) {
+    final now = DateTime.now();
+    switch (_range) {
+      case _HistoryRange.day:
+        return sessions
+            .where((s) => now.difference(s.startTime).inDays < 1)
+            .toList();
+      case _HistoryRange.week:
+        return sessions
+            .where((s) => now.difference(s.startTime).inDays < 7)
+            .toList();
+      case _HistoryRange.all:
+        return sessions;
+    }
+  }
+
+  /// Opens the full-screen detail view for a completed session.
+  void _openSessionDetail(PowerSession session) {
+    HapticFeedback.lightImpact();
+    final sessionSamples = _historicalSamples
+        .where((s) =>
+            !s.timestamp.isBefore(session.startTime) &&
+            !s.timestamp.isAfter(session.endTime.add(const Duration(minutes: 2))))
+        .toList();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SessionDetailScreen(
+          session: session,
+          sessionSamples: sessionSamples,
+        ),
+      ),
+    );
   }
 
   @override
@@ -104,41 +148,77 @@ class _HistoryScreenState extends State<HistoryScreen>
           'Power History',
           style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: false, // Clean equal distribution across screen width (no cutoffs)
-          labelColor: AppTheme.accentGreen,
-          unselectedLabelColor: textMuted,
-          indicatorColor: AppTheme.accentGreen,
-          indicatorWeight: 3,
-          labelPadding: EdgeInsets.zero,
-          tabs: const [
-            Tab(icon: Icon(Icons.flash_on_rounded, size: 18), text: 'Charge'),
-            Tab(
-              icon: Icon(Icons.battery_alert_rounded, size: 18),
-              text: 'Drain',
-            ),
-            Tab(icon: Icon(Icons.apps_rounded, size: 18), text: 'Apps'),
-            Tab(icon: Icon(Icons.nightlight_round, size: 18), text: 'Standby'),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadAllHistory,
-            tooltip: 'Refresh History',
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(98),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: SegmentedButton<_HistoryRange>(
+                    style: const ButtonStyle(
+                      padding: WidgetStatePropertyAll(
+                        EdgeInsets.symmetric(horizontal: 18),
+                      ),
+                      textStyle: WidgetStatePropertyAll(
+                        TextStyle(fontSize: 13, height: 1.0),
+                      ),
+                    ),
+                    selected: {_range},
+                    onSelectionChanged: (sel) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _range = sel.first);
+                    },
+                    segments: const [
+                      ButtonSegment(
+                        value: _HistoryRange.day,
+                        label: Text('Today'),
+                      ),
+                      ButtonSegment(
+                        value: _HistoryRange.week,
+                        label: Text('Week'),
+                      ),
+                      ButtonSegment(
+                        value: _HistoryRange.all,
+                        label: Text('All'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              TabBar(
+                controller: _tabController,
+                isScrollable: false,
+                labelColor: AppTheme.accentGreen,
+                unselectedLabelColor: textMuted,
+                indicatorColor: AppTheme.accentGreen,
+                indicatorWeight: 3,
+                labelPadding: EdgeInsets.zero,
+                tabs: const [
+                  Tab(icon: Icon(Icons.flash_on_rounded, size: 18), text: 'Charge'),
+                  Tab(
+                    icon: Icon(Icons.battery_alert_rounded, size: 18),
+                    text: 'Drain',
+                  ),
+                  Tab(icon: Icon(Icons.apps_rounded, size: 18), text: 'Apps'),
+                  Tab(icon: Icon(Icons.nightlight_round, size: 18), text: 'Standby'),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-        ],
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
+          : RefreshIndicator(
+              onRefresh: _loadAllHistory,
+              child: TabBarView(
               controller: _tabController,
               children: [
                 // Tab 1: Charging Sessions
                 _buildSessionList(
-                  _allSessions.where((s) => s.isCharging).toList(),
+                  _rangeFiltered(_allSessions.where((s) => s.isCharging).toList()),
                   surfaceColor,
                   surfaceVariant,
                   surfaceBorder,
@@ -149,7 +229,7 @@ class _HistoryScreenState extends State<HistoryScreen>
 
                 // Tab 2: Discharging Sessions
                 _buildSessionList(
-                  _allSessions.where((s) => !s.isCharging).toList(),
+                  _rangeFiltered(_allSessions.where((s) => !s.isCharging).toList()),
                   surfaceColor,
                   surfaceVariant,
                   surfaceBorder,
@@ -179,6 +259,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 ),
               ],
             ),
+          ),
     );
   }
 
@@ -226,7 +307,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             endTime: last.timestamp,
             startBatteryLevel: first.batteryLevel,
             endBatteryLevel: last.batteryLevel,
-            totalMahDelta: math.max(10, ((delta / 100.0) * 4500).round()),
+            totalMahDelta: math.max(10, ((delta / 100.0) * _capacityMah).round()),
             peakMa: maxCur,
             peakWatts: (last.voltageMv / 1000.0) * (maxCur / 1000.0),
             minTempCelsius: minT,
@@ -252,6 +333,10 @@ class _HistoryScreenState extends State<HistoryScreen>
             : 'Use your device on battery power to log discharge cycles and drain rates.',
         textColor: textColor,
         textMuted: textMuted,
+        ctaLabel: _range != _HistoryRange.all ? 'Show All History' : null,
+        onCta: _range != _HistoryRange.all
+            ? () => setState(() => _range = _HistoryRange.all)
+            : null,
       );
     }
 
@@ -403,14 +488,19 @@ class _HistoryScreenState extends State<HistoryScreen>
         final deltaPercent =
             (session.endBatteryLevel - session.startBatteryLevel).abs();
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: surfaceColor,
+        return Material(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: surfaceBorder),
-          ),
+            onTap: () => _openSessionDetail(session),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: surfaceBorder),
+              ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -517,6 +607,8 @@ class _HistoryScreenState extends State<HistoryScreen>
               ],
             ],
           ),
+            ),
+          ),
         );
       },
     );
@@ -544,11 +636,11 @@ class _HistoryScreenState extends State<HistoryScreen>
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: () async {
+              onPressed: () => guarded(() async {
                 await _telemetryService.requestIgnoreBatteryOptimizations();
-              },
+              }, errorTitle: 'Could not open battery settings'),
               icon: const Icon(Icons.security_rounded, size: 16),
-              label: const Text('Allow Background Running & AutoStart'),
+              label: const Text('Allow Background Monitoring', maxLines: 1, overflow: TextOverflow.ellipsis),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentGreen,
                 foregroundColor: Colors.black,
@@ -689,7 +781,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         if (index < standbySessions.length) {
           final session = standbySessions[index];
           final absMa = session.peakMa.abs();
-          final idleBurnRate = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
+          final idleBurnRate = ((absMa / _capacityMah) * 100.0).toStringAsFixed(1);
           final durationLabel = session.formattedDuration;
           final isOvernight = session.duration.inHours >= 4;
 
@@ -831,7 +923,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         final sleepDuration = Duration(milliseconds: sample.sleepDurationMs);
         final durationLabel = PowerFormatters.duration(sleepDuration);
         final absMa = sample.currentMilliamps.abs();
-        final idleBurnRate = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
+        final idleBurnRate = ((absMa / _capacityMah) * 100.0).toStringAsFixed(1);
 
         final Color statusColor;
         final String statusPill;
@@ -976,6 +1068,8 @@ class _HistoryScreenState extends State<HistoryScreen>
     required String subtitle,
     required Color textColor,
     required Color textMuted,
+    String? ctaLabel,
+    VoidCallback? onCta,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
@@ -1006,6 +1100,17 @@ class _HistoryScreenState extends State<HistoryScreen>
             style: TextStyle(color: textMuted, fontSize: 13, height: 1.4),
             textAlign: TextAlign.center,
           ),
+          if (ctaLabel != null && onCta != null) ...[
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onCta();
+              },
+              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+              label: Text(ctaLabel),
+            ),
+          ],
         ],
       ),
     );

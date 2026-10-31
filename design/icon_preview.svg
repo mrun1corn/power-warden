@@ -1,0 +1,57 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Battery-segment rounded background -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A0F0C"/>
+      <stop offset="1" stop-color="#000000"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#00E676"/>
+      <stop offset="1" stop-color="#00B248"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#CCFFE9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background: squircle -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none"
+        stroke="#1C2A22" stroke-width="4"/>
+
+  <!-- Shield: warden -->
+  <path d="M256 88
+           L 388 132
+           C 388 132 392 268 356 336
+           C 324 396 256 428 256 428
+           C 256 428 188 396 156 336
+           C 120 268 124 132 124 132
+           Z"
+        fill="url(#shield)"/>
+
+  <!-- Inner shield cut -->
+  <path d="M256 116
+           L 362 152
+           C 362 152 365 262 336 318
+           C 311 366 256 394 256 394
+           C 256 394 201 366 176 318
+           C 147 262 150 152 150 152
+           Z"
+        fill="#0B1510"/>
+
+  <!-- Lightning bolt: power/energy -->
+  <path d="M272 148
+           L 208 262
+           L 248 262
+           L 228 366
+           L 312 240
+           L 266 240
+           Z"
+        fill="url(#bolt)"/>
+
+  <!-- Battery level ticks on the left of the shield -->
+  <rect x="196" y="180" width="10" height="22" rx="5" fill="#00E676" opacity="0.55"/>
+  <rect x="196" y="212" width="10" height="22" rx="5" fill="#00E676" opacity="0.4"/>
+  <rect x="196" y="244" width="10" height="22" rx="5" fill="#00E676" opacity="0.28"/>
+</svg>

@@ -34,7 +34,7 @@
             android:name=".service.PairingNotificationHelper$CodeReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.powerwarden.action.PAIRING_CODE_SUBMITTED" />
+                <action android:name="com.mrun1corn.powerwarden.action.PAIRING_CODE_SUBMITTED" />
             </intent-filter>
         </receiver>
 

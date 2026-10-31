@@ -11,7 +11,8 @@ import '../../domain/models/telemetry_sample.dart';
 
 /// Lightweight, zero-code-gen Local Persistence Engine.
 /// Stores telemetry samples, anomaly incidents, and power sessions with in-memory ring-buffer batching (every 15 min),
-/// preventing continuous flash I/O wakes and pruning records older than 48 hours.
+/// preventing continuous flash I/O wakes and pruning raw telemetry older than 7 days.
+/// NOTE: Sessions & incidents are NEVER pruned — only high-frequency raw ticks.
 class AppDatabase {
   static final AppDatabase _instance = AppDatabase._internal();
   factory AppDatabase() => _instance;
@@ -27,7 +28,7 @@ class AppDatabase {
 
   static const int maxBufferSize = 30;
   static const Duration flushInterval = Duration(minutes: 15);
-  static const Duration retentionPeriod = Duration(hours: 48);
+  static const Duration retentionPeriod = Duration(days: 7);
 
   Future<void> initialize() async {
     final docsDir = await getApplicationDocumentsDirectory();
@@ -96,6 +97,38 @@ class AppDatabase {
     } catch (_) {}
   }
 
+  /// Updates an existing incident in place (e.g. closing endTime, peak refresh).
+  /// Rewrites the anomalies file, matching records by startTime + open state.
+  Future<void> updateAnomaly(AnomalyIncident updated) async {
+    if (_anomaliesFile == null || !await _anomaliesFile!.exists()) return;
+    try {
+      final lines = await _anomaliesFile!.readAsLines();
+      final out = <String>[];
+      var replaced = false;
+      for (final line in lines) {
+        if (line.trim().isEmpty) continue;
+        try {
+          final map = jsonDecode(line) as Map<String, dynamic>;
+          final sameStart = (map['startTime'] as int) ==
+              updated.startTime.millisecondsSinceEpoch;
+          final stillOpen = map['endTime'] == null;
+          if (!replaced && sameStart && stillOpen) {
+            out.add(jsonEncode(updated.toMap()));
+            replaced = true;
+          } else {
+            out.add(line);
+          }
+        } catch (_) {
+          out.add(line);
+        }
+      }
+      await _anomaliesFile!.writeAsString(
+        out.isEmpty ? '' : '${out.join('\n')}\n',
+        flush: true,
+      );
+    } catch (_) {}
+  }
+
   /// Retrieves recorded anomaly incidents for the Sentinel log.
   Future<List<AnomalyIncident>> getRecentAnomalies({int limit = 50}) async {
     final results = <AnomalyIncident>[];
@@ -146,7 +179,8 @@ class AppDatabase {
     return results;
   }
 
-  /// Prunes telemetry records older than 48 hours to conserve disk space.
+  /// Prunes raw telemetry ticks older than 7 days to conserve disk space.
+  /// Sessions and incidents are retained indefinitely.
   Future<void> pruneOldTelemetry() async {
     if (_telemetryFile == null || !await _telemetryFile!.exists()) return;
 

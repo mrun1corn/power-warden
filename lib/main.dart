@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -8,15 +11,29 @@ import 'ui/theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: AppTheme.pureOledBackground,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
-  runApp(const PowerWardenApp());
+
+  // Global safety net: uncaught platform/framework errors never crash the
+  // sentinel silently — logged and surfaced so the app stays alive.
+  FlutterError.onError = (details) {
+    debugPrint('PowerWarden caught framework error: $details');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('PowerWarden caught unhandled error: $error\n$stack');
+    return true; // swallow — the foreground service must keep running
+  };
+  runZonedGuarded(() {
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: AppTheme.pureOledBackground,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+    );
+    runApp(const PowerWardenApp());
+  }, (error, stack) {
+    debugPrint('PowerWarden caught zone error: $error\n$stack');
+  });
 }
 
 class PowerWardenApp extends StatefulWidget {

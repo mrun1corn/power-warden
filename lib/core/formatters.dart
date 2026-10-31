@@ -59,6 +59,20 @@ class PowerFormatters {
     return '~$rate%/hr';
   }
 
+  /// Formats a short local timestamp: "Oct 31, 9:28 PM"
+  static String timestamp(DateTime dt) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final local = dt.toLocal();
+    final hour =
+        local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${months[local.month - 1]} ${local.day}, $hour:$minute $ampm';
+  }
+
   /// Formats physical wattage in Watts:
   /// e.g. "18.5W", "2.1W"
   static String wattage(int millivolts, int milliamps) {

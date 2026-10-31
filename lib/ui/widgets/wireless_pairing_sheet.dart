@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/action_guard.dart';
 import '../../services/telemetry_service.dart';
 import '../theme.dart';
 
@@ -81,59 +82,71 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
     super.dispose();
   }
 
-  Future<void> _handleShizukuAuthorize() async {
-    setState(() {
-      _isRequesting = true;
-      _shizukuMessage = null;
-    });
-
-    final success = await _telemetryService.requestShizukuPermission();
-
-    if (mounted) {
+  Future<void> _handleShizukuAuthorize() {
+    return guarded(() async {
       setState(() {
-        _isRequesting = false;
-        _shizukuMessage = success
-            ? '✓ Permission requested! Please check the Shizuku prompt.'
-            : '✗ Shizuku service not responding. Please make sure Shizuku app is running.';
+        _isRequesting = true;
+        _shizukuMessage = null;
       });
-      if (success) {
-        widget.onAuthorized();
-      }
-    }
-  }
 
-  Future<void> _handleKadbPair() async {
-    FocusScope.of(context).unfocus();
-    final port = int.tryParse(_portController.text.trim()) ?? _discoveredPort;
-    final code = _codeController.text.trim();
+      final success = await _telemetryService.requestShizukuPermission();
 
-    if (port <= 0 || code.isEmpty) {
-      setState(() => _kadbMessage = 'Enter both Port & 6-digit Code.');
-      return;
-    }
-
-    setState(() {
-      _isPairingKadb = true;
-      _kadbMessage = 'Pairing with localhost:$port...';
-    });
-
-    final ok = await _telemetryService.pairKadb(port, code);
-
-    if (mounted) {
-      setState(() {
-        _isPairingKadb = false;
-        _kadbMessage = ok
-            ? '✓ Successfully Paired & Connected to Wireless ADB!'
-            : '✗ Connection to port $port failed. Please verify Wireless Debugging is enabled.';
-      });
-      if (ok) {
-        // Allow user to visibly see the success banner before closing modal
-        await Future.delayed(const Duration(milliseconds: 1200));
-        if (mounted) {
+      if (mounted) {
+        setState(() {
+          _isRequesting = false;
+          _shizukuMessage = success
+              ? '✓ Permission requested! Please check the Shizuku prompt.'
+              : '✗ Shizuku is not responding. Open the Shizuku app and start its service first, then try again.';
+        });
+        if (success) {
           widget.onAuthorized();
         }
       }
-    }
+    }, errorTitle: 'Shizuku authorization failed');
+  }
+
+  Future<void> _handleKadbPair() {
+    return guarded(() async {
+      FocusScope.of(context).unfocus();
+      final port = int.tryParse(_portController.text.trim()) ?? _discoveredPort;
+      final code = _codeController.text.trim();
+
+      if (port <= 0 && _discoveredPort <= 0) {
+        setState(() => _kadbMessage =
+            '✗ Port not detected yet. Type the 5-digit pairing port manually, or wait a few seconds for auto-detection.');
+        return;
+      }
+      if (code.length != 6) {
+        setState(() => _kadbMessage =
+            '✗ The pairing PIN must be exactly 6 digits. Get it from "Pair device with pairing code".');
+        return;
+      }
+
+      final effectivePort = port > 0 ? port : _discoveredPort;
+
+      setState(() {
+        _isPairingKadb = true;
+        _kadbMessage = 'Pairing with localhost:$effectivePort…';
+      });
+
+      final ok = await _telemetryService.pairKadb(effectivePort, code);
+
+      if (mounted) {
+        setState(() {
+          _isPairingKadb = false;
+          _kadbMessage = ok
+              ? '✓ Paired & connected to Wireless ADB!'
+              : '✗ Pairing failed. Check that Wireless Debugging is on, the PIN is fresh (they expire in ~60s), and you are on the same Wi-Fi network.';
+        });
+        if (ok) {
+          // Allow user to visibly see the success banner before closing modal
+          await Future.delayed(const Duration(milliseconds: 1200));
+          if (mounted) {
+            widget.onAuthorized();
+          }
+        }
+      }
+    }, errorTitle: 'Wireless ADB pairing failed');
   }
 
   @override

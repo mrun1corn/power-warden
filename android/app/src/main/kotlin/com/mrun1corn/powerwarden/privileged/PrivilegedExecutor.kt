@@ -1,4 +1,4 @@
-package com.powerwarden.power_warden.privileged
+package com.mrun1corn.powerwarden.privileged
 
 import android.app.ActivityManager
 import android.content.Context
@@ -654,6 +654,72 @@ class PrivilegedExecutor(private val context: Context) {
     }
 
     /**
+     * Transport-agnostic elevated power attribution (Android 14+ preferred path).
+     * Runs `dumpsys batterystats --charged` through whichever elevated shell is
+     * active (Kadb wireless-ADB OR Shizuku) — both provide identical shell
+     * identity, so behavior is the same no matter how ADB access was obtained.
+     * Parses the "Estimated power use (mAh)" section (Android's official power
+     * model) into per-package totals + component breakdown.
+     * NOTE: per-app mAh is an ESTIMATE from Android's power profile model.
+     * Returns map: packageName -> { totalMah, cpuMah, wakeMah, wifiMah }
+     * Empty map when no elevated shell is available.
+     */
+    suspend fun getModernBatteryUsageStats(): Map<String, Map<String, Any>> = withContext(Dispatchers.IO) {
+        val resultMap = mutableMapOf<String, Map<String, Any>>()
+
+        // Elevation check: either transport qualifies — they are equivalent.
+        val hasShizukuElevated = try { isShizukuAvailable() && hasShizukuPermission() } catch (_: Exception) { false }
+        val hasKadbElevated = activeKadb != null
+        if (!hasShizukuElevated && !hasKadbElevated) return@withContext resultMap
+
+        try {
+            val res = executeCommand("dumpsys batterystats --charged")
+            if (res.isSuccess && res.stdout.contains("Estimated power use")) {
+                val lines = res.stdout.lines()
+                var inEstimatedSection = false
+                val uidRegex = Regex("""Uid\s+(\w+)\s*\(([^)]+)\):\s*([\d.]+)(?:\s*\(([^)]+)\))?""")
+
+                for (line in lines) {
+                    if (line.contains("Estimated power use")) {
+                        inEstimatedSection = true
+                        continue
+                    }
+                    if (inEstimatedSection && line.isNotBlank() && !line.startsWith("  ")) {
+                        inEstimatedSection = false
+                        break
+                    }
+                    if (inEstimatedSection) {
+                        val match = uidRegex.find(line)
+                        if (match != null) {
+                            val pkg = match.groupValues[2].trim()
+                            val totalMah = match.groupValues[3].toDoubleOrNull() ?: 0.0
+                            val components = match.groupValues.getOrNull(4) ?: ""
+
+                            var cpuMah = 0.0
+                            var wakeMah = 0.0
+                            var wifiMah = 0.0
+
+                            for (part in components.split(" ")) {
+                                if (part.startsWith("cpu=")) cpuMah = part.substringAfter("cpu=").toDoubleOrNull() ?: 0.0
+                                else if (part.startsWith("wake=")) wakeMah = part.substringAfter("wake=").toDoubleOrNull() ?: 0.0
+                                else if (part.startsWith("wifi=")) wifiMah = part.substringAfter("wifi=").toDoubleOrNull() ?: 0.0
+                            }
+
+                            resultMap[pkg] = mapOf(
+                                "totalMah" to Math.round(totalMah * 100.0) / 100.0,
+                                "cpuMah" to Math.round(cpuMah * 100.0) / 100.0,
+                                "wakeMah" to Math.round(wakeMah * 100.0) / 100.0,
+                                "wifiMah" to Math.round(wifiMah * 100.0) / 100.0
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        resultMap
+    }
+
+    /**
      * Extracts subsystem power consumption (CPU, Wakelock, Wi-Fi) directly from `dumpsys batterystats`.
      */
     suspend fun getEstimatedAppPowerStats(): Map<String, Map<String, Double>> = withContext(Dispatchers.IO) {
@@ -740,8 +806,8 @@ class PrivilegedExecutor(private val context: Context) {
 
         if (!hasShizukuElevated && !hasKadbElevated) {
             // Priority 1: Automated Accessibility Service (Zero-ADB, 100% automated 1-tap Force Stop)
-            if (com.powerwarden.power_warden.service.WardenAccessibilityService.isServiceRunning) {
-                return@withContext com.powerwarden.power_warden.service.WardenAccessibilityService.stopPackageAutomatically(packageName)
+            if (com.mrun1corn.powerwarden.service.WardenAccessibilityService.isServiceRunning) {
+                return@withContext com.mrun1corn.powerwarden.service.WardenAccessibilityService.stopPackageAutomatically(packageName)
             }
 
             // Priority 2: Direct user to Android's native App Info screen so they can manually tap Force Stop

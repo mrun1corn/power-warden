@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../core/action_guard.dart';
 import '../domain/anomaly_engine.dart';
 import '../domain/models/anomaly_incident.dart';
 import '../domain/models/power_session.dart';
@@ -30,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   TelemetrySample? _currentSample;
   final List<TelemetrySample> _history = [];
   final List<AnomalyIncident> _incidents = [];
+  int _capacityMah = 4500; // calibrated from CHARGE_COUNTER at startup
 
   StreamSubscription<TelemetrySample>? _streamSub;
   Map<String, bool> _elevatedStatus = {
@@ -64,6 +66,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _initApp() async {
     await _notificationService.initialize();
     await _database.initialize();
+
+    // Calibrate battery capacity from CHARGE_COUNTER (falls back to 4500)
+    _capacityMah = await _telemetryService.getCapacityMah();
 
     // Load saved historical samples and anomalies from disk
     final savedSamples = await _database.getRecentTelemetry(limit: 60);
@@ -112,6 +117,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           sample,
           topProcess: _topProcesses.isNotEmpty ? _topProcesses.first : null,
         );
+
+        // Close any open incident once drain subsides (sets endTime)
+        final closed = _anomalyEngine.resolveOpenIncidents(sample);
+        if (closed != null) {
+          final idx = _incidents.indexWhere((i) =>
+              i.startTime == closed.startTime && i.endTime == null);
+          if (idx >= 0) {
+            _incidents[idx] = closed;
+            _database.updateAnomaly(closed);
+          }
+        }
+
         if (incident != null) {
           _incidents.insert(0, incident);
           _database.recordAnomaly(incident);
@@ -170,7 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final deltaPercent = (sample.batteryLevel - startLvl).abs();
 
       if (duration.inSeconds >= 45 || deltaPercent >= 1) {
-        final mahDelta = math.max(15, ((deltaPercent / 100.0) * 4500).round());
+        final mahDelta = math.max(15, ((deltaPercent / 100.0) * _capacityMah).round());
         final topApp = _topProcesses.isNotEmpty
             ? (_topProcesses.first['name'] as String? ?? '')
             : '';
@@ -244,9 +261,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           p['cpuMah'] = stats['cpuMah'];
           p['wakeMah'] = stats['wakeMah'];
           p['wifiMah'] = stats['wifiMah'];
+          p['powerSource'] = stats['source'];
         }
       }
     }
+
+    // Sort: apps with real battery attribution first, then by CPU
+    procs.sort((a, b) {
+      final aMah = (a['drainMah'] as num?)?.toDouble() ?? 0;
+      final bMah = (b['drainMah'] as num?)?.toDouble() ?? 0;
+      if (aMah != bMah) return bMah.compareTo(aMah);
+      final aCpu = (a['cpuPercent'] as num?)?.toDouble() ?? 0;
+      final bCpu = (b['cpuPercent'] as num?)?.toDouble() ?? 0;
+      return bCpu.compareTo(aCpu);
+    });
 
     if (mounted) {
       setState(() {
@@ -363,7 +391,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () async {
+                      onPressed: () => guarded(() async {
                         Navigator.pop(ctx);
                         final messenger = ScaffoldMessenger.of(context);
                         final ok = await _telemetryService.remediateApp(pkg);
@@ -386,7 +414,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           );
                         }
-                      },
+                      }, errorTitle: 'Could not force-stop $name'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.crimson,
                         foregroundColor: Colors.white,
@@ -622,7 +650,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildNightStandbyCard(TelemetrySample sample) {
     final hoursAsleep = (sample.sleepDurationMs / (1000.0 * 60 * 60))
         .toStringAsFixed(1);
-    final idleBurnRate = ((sample.currentMilliamps.abs() / 4500.0) * 100.0)
+    final idleBurnRate = ((sample.currentMilliamps.abs() / _capacityMah) * 100.0)
         .toStringAsFixed(1);
 
     return Container(
@@ -698,13 +726,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Icon(Icons.apps_rounded, size: 16, color: textMuted),
             const SizedBox(width: 6),
             Text(
-              'ACTIVE APP ENERGY CONSUMPTION',
+              'APP BATTERY USE (ESTIMATED)',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.0,
                 color: textMuted,
               ),
+            ),
+            const SizedBox(width: 4),
+            Tooltip(
+              message:
+                  'Per-app power is estimated by Android\'s power model from CPU, wakelock, and radio usage. Total device drain is measured directly from the battery sensor.',
+              child: Icon(Icons.info_outline_rounded, size: 13, color: textMuted),
             ),
             const Spacer(),
             if (_isLoadingProcesses)
@@ -714,18 +748,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: AppTheme.accentGreen,
-                ),
-              )
-            else
-              InkWell(
-                onTap: _loadProcesses,
-                child: const Text(
-                  'Refresh',
-                  style: TextStyle(
-                    color: AppTheme.chargingCyan,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
               ),
           ],
@@ -741,7 +763,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: Center(
               child: Text(
-                'No heavy apps consuming active CPU cycles.\nTap refresh or authorize Shizuku for deep inspection.',
+                'No heavy apps consuming active CPU cycles.\nPull down to refresh or authorize Shizuku for deep inspection.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: textMuted, fontSize: 12),
               ),
@@ -1015,7 +1037,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                '~$appEstimatedMa mA',
+                                '~$appEstimatedMa mA est.',
                                 style: const TextStyle(
                                   color: AppTheme.chargingCyan,
                                   fontWeight: FontWeight.bold,
@@ -1064,7 +1086,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               border: Border.all(color: surfaceBorder),
                             ),
                             child: Text(
-                              'Total: ${(proc['drainMah'] as num).toStringAsFixed(1)} mAh',
+                              'Since last charge: ${(proc['drainMah'] as num).toStringAsFixed(1)} mAh (est.)',
                               style: TextStyle(color: textMuted, fontSize: 9.5, fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -1122,13 +1144,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Dynamic hours left and hourly burn velocity
     final double hoursRemaining;
     if (isCharging) {
-      final neededMah = ((100 - level) / 100.0) * 4500.0;
+      final neededMah = ((100 - level) / 100.0) * _capacityMah;
       hoursRemaining = math.max(0.1, neededMah / math.max(absMa.toDouble(), 400.0));
     } else {
-      final remainingMah = (level / 100.0) * 4500.0;
+      final remainingMah = (level / 100.0) * _capacityMah;
       hoursRemaining = math.max(0.5, remainingMah / math.max(absMa.toDouble(), 180.0));
     }
-    final burnRatePerHour = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
+    final burnRatePerHour = ((absMa / _capacityMah) * 100.0).toStringAsFixed(1);
 
     final Color statusColor;
     final String statusBadge;

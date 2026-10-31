@@ -4,10 +4,25 @@ import '../domain/models/telemetry_sample.dart';
 
 /// Service managing communication across native MethodChannel and EventChannel.
 class TelemetryService {
-  static const MethodChannel _methodChannel = MethodChannel('com.powerwarden/telemetry');
-  static const EventChannel _eventChannel = EventChannel('com.powerwarden/telemetry_stream');
+  static const MethodChannel _methodChannel = MethodChannel('com.mrun1corn.powerwarden/telemetry');
+  static const EventChannel _eventChannel = EventChannel('com.mrun1corn.powerwarden/telemetry_stream');
 
   Stream<TelemetrySample>? _sampleStream;
+
+  /// Calibrated battery capacity (mAh) from CHARGE_COUNTER; 4500 fallback.
+  /// Cached after first successful read to avoid repeated platform calls.
+  int? _cachedCapacityMah;
+  Future<int> getCapacityMah() async {
+    if (_cachedCapacityMah != null) return _cachedCapacityMah!;
+    try {
+      final res = await _methodChannel.invokeMethod<int>('getCapacityMah');
+      if (res != null && res > 0) {
+        _cachedCapacityMah = res;
+        return res;
+      }
+    } catch (_) {}
+    return 4500;
+  }
 
   /// Fetches an instantaneous calibrated sample on-demand.
   Future<TelemetrySample> getInstantMetrics() async {
@@ -131,17 +146,25 @@ class TelemetryService {
     return [];
   }
 
-  /// Retrieves subsystem power consumption (CPU, Wakelock, Wi-Fi) directly from `dumpsys batterystats`.
-  Future<Map<String, Map<String, double>>> getEstimatedAppPowerStats() async {
+  /// Retrieves subsystem power consumption (CPU, Wakelock, Wi-Fi).
+/// Source: Android 14+ BatteryUsageStats API when available, else dumpsys parsing.
+/// NOTE: per-app mAh is an Android power-model ESTIMATE, not a measurement.
+Future<Map<String, Map<String, dynamic>>> getEstimatedAppPowerStats() async {
     try {
       final res = await _methodChannel.invokeMethod<Map<dynamic, dynamic>>('getEstimatedAppPowerStats');
       if (res != null) {
-        final converted = <String, Map<String, double>>{};
+        final converted = <String, Map<String, dynamic>>{};
         res.forEach((key, value) {
           if (value is Map) {
-            converted[key.toString()] = Map<String, double>.from(
-              value.map((k, v) => MapEntry(k.toString(), (v as num).toDouble())),
-            );
+            final entry = <String, dynamic>{};
+            value.forEach((k, v) {
+              if (k.toString() == 'source') {
+                entry['source'] = v.toString();
+              } else if (v is num) {
+                entry[k.toString()] = v.toDouble();
+              }
+            });
+            converted[key.toString()] = entry;
           }
         });
         return converted;
