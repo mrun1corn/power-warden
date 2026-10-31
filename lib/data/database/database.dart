@@ -96,6 +96,38 @@ class AppDatabase {
     } catch (_) {}
   }
 
+  /// Updates an existing incident in place (e.g. closing endTime, peak refresh).
+  /// Rewrites the anomalies file, matching records by startTime + open state.
+  Future<void> updateAnomaly(AnomalyIncident updated) async {
+    if (_anomaliesFile == null || !await _anomaliesFile!.exists()) return;
+    try {
+      final lines = await _anomaliesFile!.readAsLines();
+      final out = <String>[];
+      var replaced = false;
+      for (final line in lines) {
+        if (line.trim().isEmpty) continue;
+        try {
+          final map = jsonDecode(line) as Map<String, dynamic>;
+          final sameStart = (map['startTime'] as int) ==
+              updated.startTime.millisecondsSinceEpoch;
+          final stillOpen = map['endTime'] == null;
+          if (!replaced && sameStart && stillOpen) {
+            out.add(jsonEncode(updated.toMap()));
+            replaced = true;
+          } else {
+            out.add(line);
+          }
+        } catch (_) {
+          out.add(line);
+        }
+      }
+      await _anomaliesFile!.writeAsString(
+        out.isEmpty ? '' : '${out.join('\n')}\n',
+        flush: true,
+      );
+    } catch (_) {}
+  }
+
   /// Retrieves recorded anomaly incidents for the Sentinel log.
   Future<List<AnomalyIncident>> getRecentAnomalies({int limit = 50}) async {
     final results = <AnomalyIncident>[];

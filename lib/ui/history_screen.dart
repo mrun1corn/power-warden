@@ -34,6 +34,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   List<Map<String, dynamic>> _appUsageList = [];
   List<TelemetrySample> _historicalSamples = [];
   bool _isLoading = true;
+  int _capacityMah = 4500; // calibrated from CHARGE_COUNTER
 
   @override
   void initState() {
@@ -70,6 +71,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   Future<void> _loadAllHistory() async {
     setState(() => _isLoading = true);
     await _database.initialize();
+    _capacityMah = await _telemetryService.getCapacityMah();
     final sessions = await _database.getRecentSessions(limit: 60);
     final appUsage = await _telemetryService.getHistoricalAppUsage(days: 1);
     final samples = await _database.getRecentTelemetry(limit: 120);
@@ -158,9 +160,8 @@ class _HistoryScreenState extends State<HistoryScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: SizedBox(
-                  height: 34,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Center(
                   child: SegmentedButton<_HistoryRange>(
                     style: const ButtonStyle(
                       visualDensity: VisualDensity.compact,
@@ -307,7 +308,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             endTime: last.timestamp,
             startBatteryLevel: first.batteryLevel,
             endBatteryLevel: last.batteryLevel,
-            totalMahDelta: math.max(10, ((delta / 100.0) * 4500).round()),
+            totalMahDelta: math.max(10, ((delta / 100.0) * _capacityMah).round()),
             peakMa: maxCur,
             peakWatts: (last.voltageMv / 1000.0) * (maxCur / 1000.0),
             minTempCelsius: minT,
@@ -781,7 +782,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         if (index < standbySessions.length) {
           final session = standbySessions[index];
           final absMa = session.peakMa.abs();
-          final idleBurnRate = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
+          final idleBurnRate = ((absMa / _capacityMah) * 100.0).toStringAsFixed(1);
           final durationLabel = session.formattedDuration;
           final isOvernight = session.duration.inHours >= 4;
 
@@ -923,7 +924,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         final sleepDuration = Duration(milliseconds: sample.sleepDurationMs);
         final durationLabel = PowerFormatters.duration(sleepDuration);
         final absMa = sample.currentMilliamps.abs();
-        final idleBurnRate = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
+        final idleBurnRate = ((absMa / _capacityMah) * 100.0).toStringAsFixed(1);
 
         final Color statusColor;
         final String statusPill;

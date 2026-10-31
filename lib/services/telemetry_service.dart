@@ -9,6 +9,21 @@ class TelemetryService {
 
   Stream<TelemetrySample>? _sampleStream;
 
+  /// Calibrated battery capacity (mAh) from CHARGE_COUNTER; 4500 fallback.
+  /// Cached after first successful read to avoid repeated platform calls.
+  int? _cachedCapacityMah;
+  Future<int> getCapacityMah() async {
+    if (_cachedCapacityMah != null) return _cachedCapacityMah!;
+    try {
+      final res = await _methodChannel.invokeMethod<int>('getCapacityMah');
+      if (res != null && res > 0) {
+        _cachedCapacityMah = res;
+        return res;
+      }
+    } catch (_) {}
+    return 4500;
+  }
+
   /// Fetches an instantaneous calibrated sample on-demand.
   Future<TelemetrySample> getInstantMetrics() async {
     try {

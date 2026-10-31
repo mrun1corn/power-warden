@@ -22,8 +22,37 @@ class BatteryProbe(private val context: Context) {
         val voltageMillivolts: Int,
         val batteryLevel: Int,
         val isCharging: Boolean,
+        val chargeCounterUah: Long = 0L, // Remaining charge in µAh (0 if unsupported)
         val timestampEpochMs: Long = System.currentTimeMillis()
     )
+
+    /**
+     * Estimated design capacity in mAh, derived from CHARGE_COUNTER (µAh) at a known
+     * SOC level. Calibrated lazily: the first valid (counter, level) pair observed
+     * at a level >= 50% is used to extrapolate full capacity. Falls back to a
+     * conservative 4500 mAh when the kernel does not report charge counter.
+     */
+    @Volatile
+    private var calibratedCapacityMah: Int = 0
+
+    fun getCapacityMah(): Int {
+        if (calibratedCapacityMah > 0) return calibratedCapacityMah
+        try {
+            val uah = batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER)
+            if (uah > 0) {
+                val level = getCurrentLevelPercent()
+                if (level >= 50) {
+                    val estimated = ((uah * 100.0) / level / 1000.0).toInt()
+                    // Sanity bounds: real phone batteries are 2000–11000 mAh
+                    if (estimated in 2000..11000) {
+                        calibratedCapacityMah = estimated
+                        return estimated
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        return 4500
+    }
 
     /**
      * Reads battery metrics with a 3-point rolling median filter to suppress transient 100-300ms
@@ -82,14 +111,33 @@ class BatteryProbe(private val context: Context) {
         // Normalize current
         val normalizedMa = normalizeCurrent(rawCurrent, isCharging)
 
+        // Charge counter (µAh) — remaining charge; used for capacity calibration
+        val chargeCounterUah = try {
+            batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER)
+        } catch (_: Exception) { 0L }
+
         return BatterySnapshot(
             currentMilliamps = normalizedMa,
             rawCurrent = rawCurrent,
             temperatureCelsius = tempCelsius,
             voltageMillivolts = voltageMv,
             batteryLevel = level,
-            isCharging = isCharging
+            isCharging = isCharging,
+            chargeCounterUah = if (chargeCounterUah > 0) chargeCounterUah else 0L
         )
+    }
+
+    /** Current SOC percentage 0-100, or -1 when unavailable. */
+    private fun getCurrentLevelPercent(): Int {
+        val stickyIntent = context.registerReceiver(
+            null,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        )
+        return stickyIntent?.let {
+            val cur = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            if (cur >= 0 && scale > 0) (cur * 100) / scale else -1
+        } ?: batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
     }
 
     /**

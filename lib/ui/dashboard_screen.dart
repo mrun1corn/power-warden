@@ -30,6 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   TelemetrySample? _currentSample;
   final List<TelemetrySample> _history = [];
   final List<AnomalyIncident> _incidents = [];
+  int _capacityMah = 4500; // calibrated from CHARGE_COUNTER at startup
 
   StreamSubscription<TelemetrySample>? _streamSub;
   Map<String, bool> _elevatedStatus = {
@@ -64,6 +65,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _initApp() async {
     await _notificationService.initialize();
     await _database.initialize();
+
+    // Calibrate battery capacity from CHARGE_COUNTER (falls back to 4500)
+    _capacityMah = await _telemetryService.getCapacityMah();
 
     // Load saved historical samples and anomalies from disk
     final savedSamples = await _database.getRecentTelemetry(limit: 60);
@@ -112,6 +116,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           sample,
           topProcess: _topProcesses.isNotEmpty ? _topProcesses.first : null,
         );
+
+        // Close any open incident once drain subsides (sets endTime)
+        final closed = _anomalyEngine.resolveOpenIncidents(sample);
+        if (closed != null) {
+          final idx = _incidents.indexWhere((i) =>
+              i.startTime == closed.startTime && i.endTime == null);
+          if (idx >= 0) {
+            _incidents[idx] = closed;
+            _database.updateAnomaly(closed);
+          }
+        }
+
         if (incident != null) {
           _incidents.insert(0, incident);
           _database.recordAnomaly(incident);
@@ -170,7 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final deltaPercent = (sample.batteryLevel - startLvl).abs();
 
       if (duration.inSeconds >= 45 || deltaPercent >= 1) {
-        final mahDelta = math.max(15, ((deltaPercent / 100.0) * 4500).round());
+        final mahDelta = math.max(15, ((deltaPercent / 100.0) * _capacityMah).round());
         final topApp = _topProcesses.isNotEmpty
             ? (_topProcesses.first['name'] as String? ?? '')
             : '';
@@ -622,7 +638,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildNightStandbyCard(TelemetrySample sample) {
     final hoursAsleep = (sample.sleepDurationMs / (1000.0 * 60 * 60))
         .toStringAsFixed(1);
-    final idleBurnRate = ((sample.currentMilliamps.abs() / 4500.0) * 100.0)
+    final idleBurnRate = ((sample.currentMilliamps.abs() / _capacityMah) * 100.0)
         .toStringAsFixed(1);
 
     return Container(
@@ -1122,13 +1138,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Dynamic hours left and hourly burn velocity
     final double hoursRemaining;
     if (isCharging) {
-      final neededMah = ((100 - level) / 100.0) * 4500.0;
+      final neededMah = ((100 - level) / 100.0) * _capacityMah;
       hoursRemaining = math.max(0.1, neededMah / math.max(absMa.toDouble(), 400.0));
     } else {
-      final remainingMah = (level / 100.0) * 4500.0;
+      final remainingMah = (level / 100.0) * _capacityMah;
       hoursRemaining = math.max(0.5, remainingMah / math.max(absMa.toDouble(), 180.0));
     }
-    final burnRatePerHour = ((absMa / 4500.0) * 100.0).toStringAsFixed(1);
+    final burnRatePerHour = ((absMa / _capacityMah) * 100.0).toStringAsFixed(1);
 
     final Color statusColor;
     final String statusBadge;

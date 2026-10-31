@@ -128,9 +128,13 @@ class MainActivity : FlutterActivity() {
                         "thermalStatus" to thermalObserver.currentStatus,
                         "isScreenOn" to screenObserver.isScreenOn,
                         "refreshRate" to screenObserver.getActiveRefreshRate(),
-                        "sleepDurationMs" to screenObserver.getCurrentSleepDurationMs()
+                        "sleepDurationMs" to screenObserver.getCurrentSleepDurationMs(),
+                        "capacityMah" to batteryProbe.getCapacityMah()
                     )
                     result.success(map)
+                }
+                "getCapacityMah" -> {
+                    result.success(batteryProbe.getCapacityMah())
                 }
                 "startWardenService" -> {
                     val intent = Intent(this, PowerWardenService::class.java).apply {

@@ -50,7 +50,6 @@ class PowerWardenService : Service() {
 
     private val powerConnectionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            // When user plugs or unplugs charger, immediately sample and broadcast to UI & notification!
             serviceScope.launch {
                 val metrics = sampleMetrics()
                 withContext(Dispatchers.Main) {
@@ -58,6 +57,117 @@ class PowerWardenService : Service() {
                 }
                 updateSmartNotification(metrics)
             }
+        }
+    }
+
+    // ── Native charge/discharge session tracking (survives UI closure) ──
+    // The service owns session lifecycle so history is recorded even when
+    // the Flutter UI is never opened. Screen on/off seconds are accumulated
+    // per session for the standard screen-on vs deep-sleep drain split.
+    private var sessionIsCharging: Boolean? = null
+    private var sessionStartTimeMs: Long = 0L
+    private var sessionStartLevel: Int = -1
+    private var sessionStartTemp: Double = 0.0
+    private var sessionPeakMa: Int = 0
+    private var sessionPeakWatts: Double = 0.0
+    private var sessionMinTemp: Double = Double.MAX_VALUE
+    private var sessionMaxTemp: Double = Double.MIN_VALUE
+    private var sessionScreenOnMs: Long = 0L
+    private var sessionScreenOffMs: Long = 0L
+    private var lastTickScreenOn: Boolean = true
+    private var lastTickWallMs: Long = 0L
+
+    private fun onChargingStateChanged(metrics: Map<String, Any>) {
+        val nowCharging = (metrics["isCharging"] as? Boolean) ?: false
+        val now = System.currentTimeMillis()
+
+        if (sessionIsCharging == null) {
+            // First observation after service start: adopt current state
+            sessionIsCharging = nowCharging
+            sessionStartTimeMs = now
+            sessionStartLevel = (metrics["batteryLevel"] as? Int) ?: -1
+            sessionStartTemp = (metrics["temperatureCelsius"] as? Double) ?: 0.0
+            resetSessionExtremes(metrics)
+            lastTickWallMs = now
+            lastTickScreenOn = (metrics["isScreenOn"] as? Boolean) ?: true
+            return
+        }
+
+        if (sessionIsCharging != nowCharging) {
+            finalizeNativeSession(metrics, now)
+            // Start the new session
+            sessionIsCharging = nowCharging
+            sessionStartTimeMs = now
+            sessionStartLevel = (metrics["batteryLevel"] as? Int) ?: -1
+            sessionStartTemp = (metrics["temperatureCelsius"] as? Double) ?: 0.0
+            resetSessionExtremes(metrics)
+            sessionScreenOnMs = 0L
+            sessionScreenOffMs = 0L
+            lastTickWallMs = now
+            lastTickScreenOn = (metrics["isScreenOn"] as? Boolean) ?: true
+        }
+    }
+
+    private fun resetSessionExtremes(metrics: Map<String, Any>) {
+        val absMa = Math.abs((metrics["currentMa"] as? Int) ?: 0)
+        val temp = (metrics["temperatureCelsius"] as? Double) ?: 30.0
+        val voltageMv = (metrics["voltageMv"] as? Int) ?: 4000
+        sessionPeakMa = absMa
+        sessionPeakWatts = (voltageMv / 1000.0) * (absMa / 1000.0)
+        sessionMinTemp = temp
+        sessionMaxTemp = temp
+    }
+
+    /** Accumulates screen on/off time and peak stats on every telemetry tick. */
+    private fun onTelemetryTick(metrics: Map<String, Any>) {
+        if (sessionIsCharging == null) {
+            onChargingStateChanged(metrics)
+            return
+        }
+        val now = System.currentTimeMillis()
+        val isScreenOn = (metrics["isScreenOn"] as? Boolean) ?: true
+        val elapsed = if (lastTickWallMs > 0) (now - lastTickWallMs).coerceIn(0L, 120_000L) else 0L
+        if (isScreenOn) sessionScreenOnMs += elapsed else sessionScreenOffMs += elapsed
+        lastTickWallMs = now
+        lastTickScreenOn = isScreenOn
+
+        val absMa = Math.abs((metrics["currentMa"] as? Int) ?: 0)
+        val temp = (metrics["temperatureCelsius"] as? Double) ?: 30.0
+        val voltageMv = (metrics["voltageMv"] as? Int) ?: 4000
+        if (absMa > sessionPeakMa) {
+            sessionPeakMa = absMa
+            sessionPeakWatts = (voltageMv / 1000.0) * (absMa / 1000.0)
+        }
+        if (temp < sessionMinTemp) sessionMinTemp = temp
+        if (temp > sessionMaxTemp) sessionMaxTemp = temp
+    }
+
+    private fun finalizeNativeSession(metrics: Map<String, Any>, now: Long) {
+        val durationMs = now - sessionStartTimeMs
+        val endLevel = (metrics["batteryLevel"] as? Int) ?: sessionStartLevel
+        val deltaPercent = Math.abs(endLevel - sessionStartLevel)
+
+        // Persist only meaningful sessions (>= 45s or >= 1% SOC change)
+        if (durationMs >= 45_000L || deltaPercent >= 1) {
+            val capacityMah = batteryProbe.getCapacityMah()
+            val mahDelta = Math.max(
+                15,
+                ((deltaPercent / 100.0) * capacityMah).toInt()
+            )
+            recordNativePowerSession(
+                type = if (sessionIsCharging == true) "charging" else "discharging",
+                startTime = sessionStartTimeMs,
+                endTime = now,
+                startLevel = sessionStartLevel,
+                endLevel = endLevel,
+                mahDelta = mahDelta,
+                peakMa = sessionPeakMa,
+                peakWatts = sessionPeakWatts,
+                minTemp = sessionMinTemp,
+                maxTemp = sessionMaxTemp,
+                screenOnSeconds = (sessionScreenOnMs / 1000L).toInt(),
+                screenOffSeconds = (sessionScreenOffMs / 1000L).toInt()
+            )
         }
     }
 
@@ -82,7 +192,7 @@ class PowerWardenService : Service() {
                 val wakeTime = System.currentTimeMillis()
                 val snap = batteryProbe.readInstantaneousSample()
                 val deltaLevel = Math.abs(snap.batteryLevel - sleepStartLevel)
-                val mahDelta = Math.max(10, ((deltaLevel / 100.0) * 4500.0).toInt())
+                val mahDelta = Math.max(10, ((deltaLevel / 100.0) * batteryProbe.getCapacityMah()).toInt())
 
                 recordNativePowerSession(
                     type = "standby",
@@ -122,14 +232,16 @@ class PowerWardenService : Service() {
         peakMa: Int,
         peakWatts: Double,
         minTemp: Double,
-        maxTemp: Double
+        maxTemp: Double,
+        screenOnSeconds: Int = 0,
+        screenOffSeconds: Int = ((endTime - startTime) / 1000).toInt()
     ) {
         serviceScope.launch(Dispatchers.IO) {
             try {
                 val dbDir = getDatabaseDir(applicationContext)
                 val file = java.io.File(dbDir, "power_sessions.jsonl")
                 val json = org.json.JSONObject().apply {
-                    put("id", System.currentTimeMillis().toString())
+                    put("id", startTime.toString())
                     put("type", type)
                     put("startTime", startTime)
                     put("endTime", endTime)
@@ -140,8 +252,8 @@ class PowerWardenService : Service() {
                     put("peakWatts", peakWatts)
                     put("minTempCelsius", minTemp)
                     put("maxTempCelsius", maxTemp)
-                    put("screenOnSeconds", 0)
-                    put("screenOffSeconds", (endTime - startTime) / 1000)
+                    put("screenOnSeconds", screenOnSeconds)
+                    put("screenOffSeconds", screenOffSeconds)
                     put("topAppName", "")
                 }
                 file.appendText(json.toString() + "\n")
@@ -207,7 +319,8 @@ class PowerWardenService : Service() {
         val temp = (metrics["temperatureCelsius"] as? Double) ?: 35.0
         val voltageMv = (metrics["voltageMv"] as? Int) ?: 4000
         val watts = String.format("%.1f", (voltageMv / 1000.0) * (displayMa / 1000.0))
-        val percentPerHour = String.format("%.1f", (displayMa / 4500.0) * 100.0)
+        val capacityMah = batteryProbe.getCapacityMah()
+        val percentPerHour = String.format("%.1f", (displayMa.toDouble() / capacityMah) * 100.0)
 
         val title: String
         val content: String
@@ -221,7 +334,7 @@ class PowerWardenService : Service() {
         } else {
             // Dynamic hours left calculation based on live current
             val activeMa = Math.max(150, displayMa)
-            val nominalCapacityMah = 4500.0
+            val nominalCapacityMah = capacityMah.toDouble()
             val remainingMah = (level / 100.0) * nominalCapacityMah
             val hoursLeft = String.format("%.1f", remainingMah / activeMa)
             title = "🔋 $level% · -$displayMa mA ($percentPerHour%/hr)"
@@ -306,6 +419,12 @@ class PowerWardenService : Service() {
         serviceScope.launch {
             val metrics = sampleMetrics()
             logNativeTelemetrySample(metrics)
+
+            // Native session lifecycle: track charge/discharge even with UI closed
+            onTelemetryTick(metrics)
+            // Detect plug/unplug transitions immediately (also handled on tick)
+            onChargingStateChanged(metrics)
+
             withContext(Dispatchers.Main) {
                 listener?.invoke(metrics)
             }
