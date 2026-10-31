@@ -39,6 +39,12 @@ jobs:
       - name: Generate Test Coverage
         run: flutter test --coverage
 
+      - name: Install Sonar Scanner
+        run: |
+          curl -sSL -o sonar-scanner.zip "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.1.0.4477-linux-x64.zip"
+          unzip -q sonar-scanner.zip
+          echo "$PWD/sonar-scanner-6.1.0.4477-linux-x64/bin" >> "$GITHUB_PATH"
+
       - name: SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
