@@ -19,11 +19,19 @@ class PowerFormatters {
     }
   }
 
+
+  /// Converts 24-hour clock (0-23) to 12-hour display (1-12).
+  static int to12Hour(int hour24) {
+    if (hour24 == 0) return 12;
+    if (hour24 > 12) return hour24 - 12;
+    return hour24;
+  }
+
   /// Formats human-friendly local timestamps paired with relative time:
   /// e.g. "12:41 AM (32m ago)", "Yesterday 11:20 PM"
   static String relativeTime(DateTime dt) {
     final local = dt.toLocal();
-    final hour = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+    final hour = to12Hour(local.hour);
     final ampm = local.hour >= 12 ? 'PM' : 'AM';
     final minute = local.minute.toString().padLeft(2, '0');
     final timeStr = '$hour:$minute $ampm';
@@ -66,8 +74,7 @@ class PowerFormatters {
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     final local = dt.toLocal();
-    final hour =
-        local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+    final hour = to12Hour(local.hour);
     final ampm = local.hour >= 12 ? 'PM' : 'AM';
     final minute = local.minute.toString().padLeft(2, '0');
     return '${months[local.month - 1]} ${local.day}, $hour:$minute $ampm';

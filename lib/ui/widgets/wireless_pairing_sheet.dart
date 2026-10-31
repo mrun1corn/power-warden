@@ -428,7 +428,7 @@ class _WirelessPairingSheetState extends State<WirelessPairingSheet>
                               ),
                             ],
                             const SizedBox(height: 16),
-                            Divider(color: AppTheme.surfaceBorder, height: 1),
+                            const Divider(color: AppTheme.surfaceBorder, height: 1),
                             const SizedBox(height: 14),
                             // Quick Instructions & Direct Android Settings Link
                             Container(

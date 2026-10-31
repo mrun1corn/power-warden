@@ -47,7 +47,7 @@ class AdbMdnsDiscovery(private val context: Context) {
             } else if (multicastLock?.isHeld == false) {
                 multicastLock?.acquire()
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
 
         startPairingDiscovery()
         startConnectDiscovery()
@@ -57,7 +57,7 @@ class AdbMdnsDiscovery(private val context: Context) {
         if (pairingDiscoveryListener != null) return
 
         pairingDiscoveryListener = object : NsdManager.DiscoveryListener {
-            override fun onDiscoveryStarted(regType: String) {}
+            override fun onDiscoveryStarted(regType: String) { /* no-op: nothing to do when discovery starts */ }
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 if (serviceInfo.serviceType.contains("_adb-tls-pairing")) {
@@ -70,12 +70,12 @@ class AdbMdnsDiscovery(private val context: Context) {
                 }
             }
 
-            override fun onServiceLost(serviceInfo: NsdServiceInfo) {}
-            override fun onDiscoveryStopped(serviceType: String) {}
+            override fun onServiceLost(serviceInfo: NsdServiceInfo) { /* no-op: stale ports are simply re-discovered */ }
+            override fun onDiscoveryStopped(serviceType: String) { /* no-op: discovery stop is expected */ }
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
                 pairingDiscoveryListener = null
             }
-            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
+            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) { /* no-op: stop failure is harmless */ }
         }
 
         try {
@@ -89,7 +89,7 @@ class AdbMdnsDiscovery(private val context: Context) {
         if (connectDiscoveryListener != null) return
 
         connectDiscoveryListener = object : NsdManager.DiscoveryListener {
-            override fun onDiscoveryStarted(regType: String) {}
+            override fun onDiscoveryStarted(regType: String) { /* no-op: nothing to do when discovery starts */ }
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 if (serviceInfo.serviceType.contains("_adb-tls-connect")) {
@@ -102,12 +102,12 @@ class AdbMdnsDiscovery(private val context: Context) {
                 }
             }
 
-            override fun onServiceLost(serviceInfo: NsdServiceInfo) {}
-            override fun onDiscoveryStopped(serviceType: String) {}
+            override fun onServiceLost(serviceInfo: NsdServiceInfo) { /* no-op: stale ports are simply re-discovered */ }
+            override fun onDiscoveryStopped(serviceType: String) { /* no-op: discovery stop is expected */ }
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
                 connectDiscoveryListener = null
             }
-            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
+            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) { /* no-op: stop failure is harmless */ }
         }
 
         try {
@@ -158,14 +158,14 @@ class AdbMdnsDiscovery(private val context: Context) {
             if (multicastLock?.isHeld == true) {
                 multicastLock?.release()
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
 
         pairingDiscoveryListener?.let {
-            try { nsdManager.stopServiceDiscovery(it) } catch (_: Exception) {}
+            try { nsdManager.stopServiceDiscovery(it) } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
             pairingDiscoveryListener = null
         }
         connectDiscoveryListener?.let {
-            try { nsdManager.stopServiceDiscovery(it) } catch (_: Exception) {}
+            try { nsdManager.stopServiceDiscovery(it) } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
             connectDiscoveryListener = null
         }
         resolveQueue.clear()

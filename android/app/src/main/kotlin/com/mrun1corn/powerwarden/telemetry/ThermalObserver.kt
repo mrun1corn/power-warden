@@ -40,7 +40,7 @@ class ThermalObserver(
             thermalListener?.let {
                 try {
                     powerManager.removeThermalStatusListener(it)
-                } catch (_: Exception) {}
+                } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
                 thermalListener = null
             }
         }

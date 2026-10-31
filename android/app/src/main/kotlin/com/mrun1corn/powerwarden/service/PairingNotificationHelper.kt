@@ -40,7 +40,7 @@ class PairingNotificationHelper(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
                 notificationManager.deleteNotificationChannel("power_warden_pairing")
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
 
             val channel = NotificationChannel(
                 CHANNEL_ID,

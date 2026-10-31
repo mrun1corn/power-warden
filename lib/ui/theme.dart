@@ -109,62 +109,50 @@ class AppTheme {
 
   static ThemeData get theme => darkTheme;
 
-  static ThemeData _baseTheme({
-    required Brightness brightness,
-    required Color background,
-    required Color surface,
-    required Color surfaceContainerHighest,
-    required Color primary,
-    required Color secondary,
-    required Color error,
-    required Color onSurface,
-    required Color outline,
-    required Color variant,
-    required TextTheme textTheme,
-  }) {
-    final isDark = brightness == Brightness.dark;
+  static ThemeData _baseTheme(_Palette p) {
+    final isDark = p.brightness == Brightness.dark;
     final scheme = isDark
         ? ColorScheme.dark(
-            surface: surface,
-            surfaceContainerHighest: surfaceContainerHighest,
-            primary: primary,
-            secondary: secondary,
-            error: error,
-            onSurface: onSurface,
+            surface: p.surface,
+            surfaceContainerHighest: p.surfaceContainerHighest,
+            primary: p.primary,
+            secondary: p.secondary,
+            error: p.error,
+            onSurface: p.onSurface,
             onError: Colors.white,
-            outline: outline,
+            outline: p.outline,
           )
         : ColorScheme.light(
-            surface: surface,
-            surfaceContainerHighest: surfaceContainerHighest,
-            primary: primary,
-            secondary: secondary,
-            error: error,
-            onSurface: onSurface,
+            surface: p.surface,
+            surfaceContainerHighest: p.surfaceContainerHighest,
+            primary: p.primary,
+            secondary: p.secondary,
+            error: p.error,
+            onSurface: p.onSurface,
             onError: Colors.white,
-            outline: outline,
+            outline: p.outline,
           );
 
     return ThemeData(
       useMaterial3: true,
-      brightness: brightness,
-      scaffoldBackgroundColor: background,
+      brightness: p.brightness,
+      scaffoldBackgroundColor: p.background,
       colorScheme: scheme,
-      textTheme: textTheme,
+      textTheme: p.textTheme,
       cardTheme: CardThemeData(
-        color: surface,
+        color: p.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          side: BorderSide(color: outline, width: 1),
+          side: BorderSide(color: p.outline, width: 1),
           borderRadius: BorderRadius.circular(16),
         ),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: background,
+        backgroundColor: p.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: textTheme.titleLarge,
+        titleTextStyle: p.textTheme.titleLarge,
       ),
       tabBarTheme: const TabBarThemeData(
         labelColor: statusHealthy,
@@ -173,30 +161,30 @@ class AppTheme {
         dividerColor: Colors.transparent,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: background,
+        backgroundColor: p.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         height: 64,
-        indicatorColor: primary.withValues(alpha: isDark ? 0.2 : 0.15),
+        indicatorColor: p.primary.withValues(alpha: isDark ? 0.2 : 0.15),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: variant,
-        contentTextStyle: textTheme.bodyMedium?.copyWith(
+        backgroundColor: p.variant,
+        contentTextStyle: p.textTheme.bodyMedium?.copyWith(
           color: isDark ? textPrimary : textPrimaryLight,
           fontWeight: FontWeight.w600,
         ),
         behavior: SnackBarBehavior.floating,
       ),
       dividerTheme: DividerThemeData(
-        color: outline.withValues(alpha: 0.5),
+        color: p.outline.withValues(alpha: 0.5),
         thickness: 1,
         space: 1,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: primary,
+          backgroundColor: p.primary,
           foregroundColor: isDark ? Colors.black : Colors.white,
-          textStyle: textTheme.titleSmall,
+          textStyle: p.textTheme.titleSmall,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
@@ -204,7 +192,7 @@ class AppTheme {
     );
   }
 
-  static ThemeData get darkTheme => _baseTheme(
+  static ThemeData get darkTheme => _baseTheme(_Palette(
         brightness: Brightness.dark,
         background: pureOledBackground,
         surface: surfaceDark,
@@ -216,9 +204,9 @@ class AppTheme {
         outline: surfaceBorderDark,
         variant: surfaceVariantDark,
         textTheme: darkTextTheme,
-      );
+      ));
 
-  static ThemeData get lightTheme => _baseTheme(
+  static ThemeData get lightTheme => _baseTheme(_Palette(
         brightness: Brightness.light,
         background: lightBackground,
         surface: surfaceLight,
@@ -230,7 +218,7 @@ class AppTheme {
         outline: surfaceBorderLight,
         variant: surfaceVariantLight,
         textTheme: lightTextTheme,
-      );
+      ));
 
   static SystemUiOverlayStyle overlayStyleFor(Brightness brightness) {
     final isLight = brightness == Brightness.light;
@@ -241,4 +229,33 @@ class AppTheme {
       systemNavigationBarIconBrightness: isLight ? Brightness.dark : Brightness.light,
     );
   }
+}
+
+/// Palette bundle for [AppTheme._baseTheme] (keeps parameter counts sane).
+class _Palette {
+  const _Palette({
+    required this.brightness,
+    required this.background,
+    required this.surface,
+    required this.surfaceContainerHighest,
+    required this.primary,
+    required this.secondary,
+    required this.error,
+    required this.onSurface,
+    required this.outline,
+    required this.variant,
+    required this.textTheme,
+  });
+
+  final Brightness brightness;
+  final Color background;
+  final Color surface;
+  final Color surfaceContainerHighest;
+  final Color primary;
+  final Color secondary;
+  final Color error;
+  final Color onSurface;
+  final Color outline;
+  final Color variant;
+  final TextTheme textTheme;
 }

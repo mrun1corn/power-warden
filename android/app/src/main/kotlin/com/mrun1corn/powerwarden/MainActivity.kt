@@ -96,13 +96,13 @@ class MainActivity : FlutterActivity() {
                     privilegedExecutor.autoGrantPersistentPermissions()
                 }
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
 
         // Ensure notification permission on Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2001)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2001)
         }
 
         // Hook background service listener into EventSink
@@ -178,7 +178,7 @@ class MainActivity : FlutterActivity() {
                             startActivity(intent)
                             opened = true
                             break
-                        } catch (_: Exception) {}
+                        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
                     }
                     result.success(opened)
                 }
@@ -298,7 +298,7 @@ class MainActivity : FlutterActivity() {
                                     startActivity(oemIntent)
                                     break
                                 }
-                            } catch (_: Exception) {}
+                            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
                         }
 
                         result.success(true)

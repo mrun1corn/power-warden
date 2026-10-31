@@ -61,7 +61,7 @@ class WardenAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
-    override fun onInterrupt() {}
+    override fun onInterrupt() { /* no-op: system interrupt, nothing to clean up */ }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (targetPackageToStop == null || event == null) return

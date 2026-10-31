@@ -17,6 +17,11 @@ import java.lang.reflect.Method
  */
 class PrivilegedExecutor(private val context: Context) {
 
+    private companion object {
+        const val LOCALHOST = "127.0.0.1"
+        const val ESTIMATED_POWER_MARKER = ESTIMATED_POWER_MARKER
+    }
+
     data class ExecutionResult(
         val exitCode: Int,
         val stdout: String,
@@ -38,7 +43,7 @@ class PrivilegedExecutor(private val context: Context) {
             )
             method.isAccessible = true
             shizukuNewProcessMethod = method
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
 
         // Fallback resolution using Shizuku.newProcess public API
         if (shizukuNewProcessMethod == null) {
@@ -50,7 +55,7 @@ class PrivilegedExecutor(private val context: Context) {
                     String::class.java
                 )
                 shizukuNewProcessMethod = method
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
     }
 
@@ -91,7 +96,7 @@ class PrivilegedExecutor(private val context: Context) {
      */
     suspend fun pairKadb(pairingPort: Int, code: String, connectPort: Int? = null): Boolean = withContext(Dispatchers.IO) {
         try {
-            com.flyfishxu.kadb.Kadb.pair("127.0.0.1", pairingPort, code)
+            com.flyfishxu.kadb.Kadb.pair(LOCALHOST, pairingPort, code)
 
             context.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
                 .edit()
@@ -121,7 +126,7 @@ class PrivilegedExecutor(private val context: Context) {
      */
     suspend fun connectKadb(port: Int): Boolean = withContext(Dispatchers.IO) {
         try {
-            val candidate = com.flyfishxu.kadb.Kadb.create("127.0.0.1", port)
+            val candidate = com.flyfishxu.kadb.Kadb.create(LOCALHOST, port)
             val resp = candidate.shell("echo ping")
             val ok = resp.exitCode == 0
             if (ok) {
@@ -138,7 +143,7 @@ class PrivilegedExecutor(private val context: Context) {
                     candidate.shell("pm grant $pkg android.permission.BATTERY_STATS")
                     candidate.shell("pm grant $pkg android.permission.PACKAGE_USAGE_STATS")
                     candidate.shell("pm grant $pkg android.permission.DUMP")
-                } catch (_: Exception) {}
+                } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
             }
             ok
         } catch (_: Exception) {
@@ -172,7 +177,7 @@ class PrivilegedExecutor(private val context: Context) {
         val listeningPorts = findListeningTcpPorts()
         for (port in listeningPorts) {
             try {
-                val candidate = com.flyfishxu.kadb.Kadb.create("127.0.0.1", port)
+                val candidate = com.flyfishxu.kadb.Kadb.create(LOCALHOST, port)
                 val resp = candidate.shell("echo ping")
                 if (resp.exitCode == 0) {
                     activeKadb = candidate
@@ -184,7 +189,7 @@ class PrivilegedExecutor(private val context: Context) {
                     autoGrantPersistentPermissions()
                     return@withContext true
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
         false
     }
@@ -214,7 +219,7 @@ class PrivilegedExecutor(private val context: Context) {
                         }
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
         return ports
     }
@@ -287,7 +292,7 @@ class PrivilegedExecutor(private val context: Context) {
                 try {
                     val resp = activeKadb!!.shell(command)
                     return@withContext ExecutionResult(resp.exitCode, resp.output.trim(), "", resp.exitCode == 0)
-                } catch (_: Exception) {}
+                } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
             }
 
             // Priority 3: Standard unprivileged Android process shell
@@ -399,7 +404,7 @@ class PrivilegedExecutor(private val context: Context) {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
 
         // Strategy 2: BatteryStats & UsageStats API (Available when BATTERY_STATS / PACKAGE_USAGE_STATS is granted!)
         if (list.size <= 1) {
@@ -438,7 +443,7 @@ class PrivilegedExecutor(private val context: Context) {
                         )
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
 
         // Strategy 3: Running Services & ActivityManager Fallback
@@ -477,7 +482,7 @@ class PrivilegedExecutor(private val context: Context) {
                         )
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
 
         // Strategy 4: Installed User Applications Fallback (Guarantees full app list on all Android versions)
@@ -513,7 +518,7 @@ class PrivilegedExecutor(private val context: Context) {
                         )
                     )
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
 
         list.sortedByDescending { (it["cpuPercent"] as? Double) ?: 0.0 }.take(15)
@@ -565,7 +570,7 @@ class PrivilegedExecutor(private val context: Context) {
                     )
                 )
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
 
         // Fallback: If UsageStatsManager is unpermitted, query user-installed apps
         if (list.isEmpty()) {
@@ -587,7 +592,7 @@ class PrivilegedExecutor(private val context: Context) {
                         )
                     )
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
 
         list
@@ -674,13 +679,13 @@ class PrivilegedExecutor(private val context: Context) {
 
         try {
             val res = executeCommand("dumpsys batterystats --charged")
-            if (res.isSuccess && res.stdout.contains("Estimated power use")) {
+            if (res.isSuccess && res.stdout.contains(ESTIMATED_POWER_MARKER)) {
                 val lines = res.stdout.lines()
                 var inEstimatedSection = false
                 val uidRegex = Regex("""Uid\s+(\w+)\s*\(([^)]+)\):\s*([\d.]+)(?:\s*\(([^)]+)\))?""")
 
                 for (line in lines) {
-                    if (line.contains("Estimated power use")) {
+                    if (line.contains(ESTIMATED_POWER_MARKER)) {
                         inEstimatedSection = true
                         continue
                     }
@@ -715,7 +720,7 @@ class PrivilegedExecutor(private val context: Context) {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         resultMap
     }
 
@@ -726,13 +731,13 @@ class PrivilegedExecutor(private val context: Context) {
         val resultMap = mutableMapOf<String, Map<String, Double>>()
         try {
             val res = executeCommand("dumpsys batterystats --charged")
-            if (res.isSuccess && res.stdout.contains("Estimated power use")) {
+            if (res.isSuccess && res.stdout.contains(ESTIMATED_POWER_MARKER)) {
                 val lines = res.stdout.lines()
                 var inEstimatedSection = false
                 val uidRegex = Regex("""Uid\s+(\w+)\s*\(([^)]+)\):\s*([\d.]+)(?:\s*\(([^)]+)\))?""")
 
                 for (line in lines) {
-                    if (line.contains("Estimated power use")) {
+                    if (line.contains(ESTIMATED_POWER_MARKER)) {
                         inEstimatedSection = true
                         continue
                     }
@@ -767,7 +772,7 @@ class PrivilegedExecutor(private val context: Context) {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         resultMap
     }
 
@@ -820,7 +825,7 @@ class PrivilegedExecutor(private val context: Context) {
                     }
                     context.startActivity(intent)
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
             return@withContext false
         }
 

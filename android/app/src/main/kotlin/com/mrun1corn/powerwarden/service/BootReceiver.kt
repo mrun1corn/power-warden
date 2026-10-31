@@ -22,7 +22,7 @@ class BootReceiver : BroadcastReceiver() {
                 } else {
                     context.startService(serviceIntent)
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
     }
 }

@@ -809,31 +809,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
 
               final isDark = Theme.of(context).brightness == Brightness.dark;
-              final cardBg = isDark
-                  ? (isCriticalCpu
-                        ? AppTheme.crimson.withValues(alpha: 0.08)
-                        : (isHeavy
-                              ? AppTheme.amber.withValues(alpha: 0.05)
-                              : AppTheme.surfaceVariantDark.withValues(
-                                  alpha: 0.5,
-                                )))
-                  : (isCriticalCpu
-                        ? AppTheme.crimson.withValues(alpha: 0.08)
-                        : (isHeavy
-                              ? AppTheme.amber.withValues(alpha: 0.06)
-                              : AppTheme.surfaceLight));
 
+              // Resolve card styling from severity, per brightness — no nested ternaries.
+              Color severityBg(Color calmBg) {
+                if (isCriticalCpu) return AppTheme.crimson.withValues(alpha: 0.08);
+                if (isHeavy) {
+                  return isDark
+                      ? AppTheme.amber.withValues(alpha: 0.05)
+                      : AppTheme.amber.withValues(alpha: 0.06);
+                }
+                return calmBg;
+              }
+
+              Color severityBorder(Color calmBorder) {
+                if (isCriticalCpu) return AppTheme.crimson.withValues(alpha: 0.4);
+                if (isHeavy) {
+                  return isDark
+                      ? AppTheme.amber.withValues(alpha: 0.3)
+                      : AppTheme.amber.withValues(alpha: 0.4);
+                }
+                return calmBorder;
+              }
+
+              final cardBg = isDark
+                  ? severityBg(AppTheme.surfaceVariantDark.withValues(alpha: 0.5))
+                  : severityBg(AppTheme.surfaceLight);
               final cardBorder = isDark
-                  ? (isHeavy
-                        ? (isCriticalCpu
-                              ? AppTheme.crimson.withValues(alpha: 0.4)
-                              : AppTheme.amber.withValues(alpha: 0.3))
-                        : AppTheme.surfaceBorderDark.withValues(alpha: 0.6))
-                  : (isHeavy
-                        ? (isCriticalCpu
-                              ? AppTheme.crimson.withValues(alpha: 0.4)
-                              : AppTheme.amber.withValues(alpha: 0.4))
-                        : AppTheme.surfaceBorderLight);
+                  ? severityBorder(AppTheme.surfaceBorderDark.withValues(alpha: 0.6))
+                  : severityBorder(AppTheme.surfaceBorderLight);
 
               final titleColor = isDark
                   ? Colors.white
@@ -842,12 +845,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ? AppTheme.textMuted
                   : AppTheme.textMutedLight;
 
-              final stateColor = isHeavy
-                  ? (isCriticalCpu ? AppTheme.crimson : AppTheme.amber)
-                  : AppTheme.accentGreen;
-              final stateLabel = isCriticalCpu
-                  ? 'CRITICAL'
-                  : (isHeavy ? 'HEAVY' : 'CALM');
+              final Color stateColor;
+              if (isCriticalCpu) {
+                stateColor = AppTheme.crimson;
+              } else if (isHeavy) {
+                stateColor = AppTheme.amber;
+              } else {
+                stateColor = AppTheme.accentGreen;
+              }
+              final String stateLabel;
+              if (isCriticalCpu) {
+                stateLabel = 'CRITICAL';
+              } else if (isHeavy) {
+                stateLabel = 'HEAVY';
+              } else {
+                stateLabel = 'CALM';
+              }
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -968,11 +981,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   decoration: BoxDecoration(
                                     color: isHeavy
                                         ? (isDark
-                                              ? AppTheme.crimson.withValues(
-                                                  alpha: 0.15,
-                                                )
-                                              : AppTheme.crimsonLight
-                                                    .withValues(alpha: 0.12))
+                                              ? AppTheme.crimson
+                                              : AppTheme.crimsonLight)
+                                              .withValues(alpha: 0.13)
                                         : (isDark
                                               ? AppTheme.surfaceVariantDark
                                               : AppTheme.surfaceVariantLight),
@@ -980,8 +991,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     border: Border.all(
                                       color: isHeavy
                                           ? (isDark
-                                                    ? AppTheme.crimson
-                                                    : AppTheme.crimsonLight)
+                                                ? AppTheme.crimson
+                                                : AppTheme.crimsonLight)
                                                 .withValues(alpha: 0.4)
                                           : (isDark
                                                 ? AppTheme.surfaceBorderDark

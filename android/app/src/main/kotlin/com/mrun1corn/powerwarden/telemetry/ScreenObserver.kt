@@ -61,7 +61,7 @@ class ScreenObserver(
     fun stop() {
         try {
             context.unregisterReceiver(receiver)
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
     }
 
     /**

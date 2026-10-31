@@ -50,7 +50,7 @@ class BatteryProbe(private val context: Context) {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         return 4500
     }
 
@@ -162,7 +162,7 @@ class BatteryProbe(private val context: Context) {
                         return value
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
         return 0L
     }
@@ -192,16 +192,16 @@ class BatteryProbe(private val context: Context) {
 
         // Enforce consistent polarity: Positive = Draining, Negative = Charging
         // If raw current itself was negative and not in charging state, or isCharging is explicitly true
-        return if (isCharging || raw < 0L && scaledMa > 50.0 && !isRawDischarging(raw)) {
+        return if (isCharging || raw < 0L && scaledMa > 50.0 && !isRawDischarging()) {
             -roundedMa
         } else {
             roundedMa
         }
     }
 
-    private fun isRawDischarging(raw: Long): Boolean {
-        // Some kernels report discharging as negative (e.g. -350 mA) and charging as positive.
-        // We cross-check with charging status in readInstantaneousSample.
+    private fun isRawDischarging(): Boolean {
+        // Polarity is normalized upstream by cross-checking the charging status
+        // in readInstantaneousSample(); no additional raw-polarity heuristic needed.
         return false
     }
 }

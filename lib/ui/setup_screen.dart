@@ -171,9 +171,9 @@ class _SetupScreenState extends State<SetupScreen> {
       decoration: BoxDecoration(
         color: active
             ? AppTheme.accentGreen
-            : (done
+            : done
                   ? AppTheme.accentGreen.withValues(alpha: 0.4)
-                  : AppTheme.surfaceVariant),
+                  : AppTheme.surfaceVariant,
         borderRadius: BorderRadius.circular(3),
       ),
     );
@@ -272,10 +272,10 @@ class _SetupScreenState extends State<SetupScreen> {
         const Spacer(),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.surfaceBorder),
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+            border: Border.fromBorderSide(BorderSide(color: AppTheme.surfaceBorder)),
           ),
           child: Row(
             children: [

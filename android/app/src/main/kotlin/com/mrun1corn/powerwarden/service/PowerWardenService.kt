@@ -234,30 +234,56 @@ class PowerWardenService : Service() {
         minTemp: Double,
         maxTemp: Double,
         screenOnSeconds: Int = 0,
-        screenOffSeconds: Int = ((endTime - startTime) / 1000).toInt()
+        screenOffSeconds: Int = ((endTime - startTime) / 1000).toInt(),
     ) {
+        recordNativePowerSession(
+            NativeSession(
+                type, startTime, endTime, startLevel, endLevel,
+                mahDelta, peakMa, peakWatts, minTemp, maxTemp,
+                screenOnSeconds, screenOffSeconds,
+            )
+        )
+    }
+
+    /** Bundles a completed session's fields (keeps call sites readable). */
+    private data class NativeSession(
+        val type: String,
+        val startTime: Long,
+        val endTime: Long,
+        val startLevel: Int,
+        val endLevel: Int,
+        val mahDelta: Int,
+        val peakMa: Int,
+        val peakWatts: Double,
+        val minTemp: Double,
+        val maxTemp: Double,
+        val screenOnSeconds: Int,
+        val screenOffSeconds: Int,
+    )
+
+    private fun recordNativePowerSession(s: NativeSession) {
         serviceScope.launch(Dispatchers.IO) {
             try {
                 val dbDir = getDatabaseDir(applicationContext)
                 val file = java.io.File(dbDir, "power_sessions.jsonl")
                 val json = org.json.JSONObject().apply {
-                    put("id", startTime.toString())
-                    put("type", type)
-                    put("startTime", startTime)
-                    put("endTime", endTime)
-                    put("startBatteryLevel", startLevel)
-                    put("endBatteryLevel", endLevel)
-                    put("totalMahDelta", mahDelta)
-                    put("peakMa", peakMa)
-                    put("peakWatts", peakWatts)
-                    put("minTempCelsius", minTemp)
-                    put("maxTempCelsius", maxTemp)
-                    put("screenOnSeconds", screenOnSeconds)
-                    put("screenOffSeconds", screenOffSeconds)
+                    put("id", s.startTime.toString())
+                    put("type", s.type)
+                    put("startTime", s.startTime)
+                    put("endTime", s.endTime)
+                    put("startBatteryLevel", s.startLevel)
+                    put("endBatteryLevel", s.endLevel)
+                    put("totalMahDelta", s.mahDelta)
+                    put("peakMa", s.peakMa)
+                    put("peakWatts", s.peakWatts)
+                    put("minTempCelsius", s.minTemp)
+                    put("maxTempCelsius", s.maxTemp)
+                    put("screenOnSeconds", s.screenOnSeconds)
+                    put("screenOffSeconds", s.screenOffSeconds)
                     put("topAppName", "")
                 }
                 file.appendText(json.toString() + "\n")
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
     }
 
@@ -279,7 +305,7 @@ class PowerWardenService : Service() {
                     put("refreshRate", metrics["refreshRate"] ?: 60.0)
                 }
                 file.appendText(json.toString() + "\n")
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
     }
 
@@ -432,10 +458,9 @@ class PowerWardenService : Service() {
             // Smart notification update: updates smoothly without waking device unnecessarily
             val now = System.currentTimeMillis()
             val isScreenOn = screenObserver.isInteractive()
-            if (isScreenOn && (now - lastNotificationUpdateMs >= 4_000L)) {
-                lastNotificationUpdateMs = now
-                updateSmartNotification(metrics)
-            } else if (!isScreenOn && (now - lastNotificationUpdateMs >= 60_000L)) {
+            // Throttled smart-notification refresh: 4s while awake, 60s asleep.
+            val notificationIntervalMs = if (isScreenOn) 4_000L else 60_000L
+            if (now - lastNotificationUpdateMs >= notificationIntervalMs) {
                 lastNotificationUpdateMs = now
                 updateSmartNotification(metrics)
             }
@@ -483,7 +508,7 @@ class PowerWardenService : Service() {
         handler.removeCallbacks(tickerRunnable)
         try {
             unregisterReceiver(powerConnectionReceiver)
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         thermalObserver.stop()
         screenObserver.stop()
         serviceScope.cancel()
