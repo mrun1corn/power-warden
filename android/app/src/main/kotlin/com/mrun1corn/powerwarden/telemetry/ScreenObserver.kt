@@ -1,4 +1,4 @@
-package com.powerwarden.power_warden.telemetry
+package com.mrun1corn.powerwarden.telemetry
 
 import android.content.BroadcastReceiver
 import android.content.Context

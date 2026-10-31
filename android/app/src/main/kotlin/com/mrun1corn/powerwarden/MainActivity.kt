@@ -1,4 +1,4 @@
-package com.powerwarden.power_warden
+package com.mrun1corn.powerwarden
 
 import android.content.Context
 import android.content.Intent
@@ -6,11 +6,11 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
 import androidx.annotation.NonNull
-import com.powerwarden.power_warden.privileged.PrivilegedExecutor
-import com.powerwarden.power_warden.service.PowerWardenService
-import com.powerwarden.power_warden.telemetry.BatteryProbe
-import com.powerwarden.power_warden.telemetry.ScreenObserver
-import com.powerwarden.power_warden.telemetry.ThermalObserver
+import com.mrun1corn.powerwarden.privileged.PrivilegedExecutor
+import com.mrun1corn.powerwarden.service.PowerWardenService
+import com.mrun1corn.powerwarden.telemetry.BatteryProbe
+import com.mrun1corn.powerwarden.telemetry.ScreenObserver
+import com.mrun1corn.powerwarden.telemetry.ThermalObserver
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -19,15 +19,15 @@ import kotlinx.coroutines.*
 
 class MainActivity : FlutterActivity() {
 
-    private val METHOD_CHANNEL = "com.powerwarden/telemetry"
-    private val EVENT_CHANNEL = "com.powerwarden/telemetry_stream"
+    private val METHOD_CHANNEL = "com.mrun1corn.powerwarden/telemetry"
+    private val EVENT_CHANNEL = "com.mrun1corn.powerwarden/telemetry_stream"
 
     private lateinit var batteryProbe: BatteryProbe
     private lateinit var thermalObserver: ThermalObserver
     private lateinit var screenObserver: ScreenObserver
     private lateinit var privilegedExecutor: PrivilegedExecutor
-    private lateinit var mdnsDiscovery: com.powerwarden.power_warden.privileged.AdbMdnsDiscovery
-    private lateinit var pairingNotificationHelper: com.powerwarden.power_warden.service.PairingNotificationHelper
+    private lateinit var mdnsDiscovery: com.mrun1corn.powerwarden.privileged.AdbMdnsDiscovery
+    private lateinit var pairingNotificationHelper: com.mrun1corn.powerwarden.service.PairingNotificationHelper
 
     private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var eventSink: EventChannel.EventSink? = null
@@ -39,8 +39,8 @@ class MainActivity : FlutterActivity() {
         thermalObserver = ThermalObserver(this) {}
         screenObserver = ScreenObserver(this) { _, _ -> }
         privilegedExecutor = PrivilegedExecutor(this)
-        mdnsDiscovery = com.powerwarden.power_warden.privileged.AdbMdnsDiscovery(this)
-        pairingNotificationHelper = com.powerwarden.power_warden.service.PairingNotificationHelper(this)
+        mdnsDiscovery = com.mrun1corn.powerwarden.privileged.AdbMdnsDiscovery(this)
+        pairingNotificationHelper = com.mrun1corn.powerwarden.service.PairingNotificationHelper(this)
 
         mdnsDiscovery.onPairingPortDiscovered = { port ->
             // Always post pairing notification when an active pairing service is broadcasting on the network
@@ -53,7 +53,7 @@ class MainActivity : FlutterActivity() {
             privilegedExecutor.autoReconnect()
         }
 
-        com.powerwarden.power_warden.service.PairingNotificationHelper.onCodeReceivedListener = { code ->
+        com.mrun1corn.powerwarden.service.PairingNotificationHelper.onCodeReceivedListener = { code ->
             val pairingPort = mdnsDiscovery.discoveredPairingPort
             val connectPort = mdnsDiscovery.discoveredConnectPort
             if (pairingPort != null) {
@@ -327,7 +327,7 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "isAccessibilityServiceActive" -> {
-                    result.success(com.powerwarden.power_warden.service.WardenAccessibilityService.isServiceRunning)
+                    result.success(com.mrun1corn.powerwarden.service.WardenAccessibilityService.isServiceRunning)
                 }
                 "getSharedPrefBool" -> {
                     val key = call.argument<String>("key") ?: ""

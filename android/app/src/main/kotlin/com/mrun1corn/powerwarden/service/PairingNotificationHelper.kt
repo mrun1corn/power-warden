@@ -1,4 +1,4 @@
-package com.powerwarden.power_warden.service
+package com.mrun1corn.powerwarden.service
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -24,7 +24,7 @@ class PairingNotificationHelper(private val context: Context) {
     companion object {
         const val CHANNEL_ID = "power_warden_pairing_headsup_v4"
         const val NOTIFICATION_ID = 9001
-        const val ACTION_CODE_SUBMITTED = "com.powerwarden.action.PAIRING_CODE_SUBMITTED"
+        const val ACTION_CODE_SUBMITTED = "com.mrun1corn.powerwarden.action.PAIRING_CODE_SUBMITTED"
         const val KEY_PAIRING_CODE = "key_pairing_code"
 
         var onCodeReceivedListener: ((String) -> Unit)? = null
@@ -144,7 +144,7 @@ class PairingNotificationHelper(private val context: Context) {
                     val pendingResult = goAsync()
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                         try {
-                            val executor = com.powerwarden.power_warden.privileged.PrivilegedExecutor(ctx.applicationContext)
+                            val executor = com.mrun1corn.powerwarden.privileged.PrivilegedExecutor(ctx.applicationContext)
                             val finalPort = if (port > 0) port else {
                                 ctx.getSharedPreferences("power_warden_adb", Context.MODE_PRIVATE)
                                     .getInt("last_pairing_port", -1)

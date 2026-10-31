@@ -4,8 +4,8 @@ import '../domain/models/telemetry_sample.dart';
 
 /// Service managing communication across native MethodChannel and EventChannel.
 class TelemetryService {
-  static const MethodChannel _methodChannel = MethodChannel('com.powerwarden/telemetry');
-  static const EventChannel _eventChannel = EventChannel('com.powerwarden/telemetry_stream');
+  static const MethodChannel _methodChannel = MethodChannel('com.mrun1corn.powerwarden/telemetry');
+  static const EventChannel _eventChannel = EventChannel('com.mrun1corn.powerwarden/telemetry_stream');
 
   Stream<TelemetrySample>? _sampleStream;
 

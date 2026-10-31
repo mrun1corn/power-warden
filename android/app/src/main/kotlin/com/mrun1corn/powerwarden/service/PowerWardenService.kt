@@ -1,4 +1,4 @@
-package com.powerwarden.power_warden.service
+package com.mrun1corn.powerwarden.service
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -14,9 +14,9 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
-import com.powerwarden.power_warden.telemetry.BatteryProbe
-import com.powerwarden.power_warden.telemetry.ScreenObserver
-import com.powerwarden.power_warden.telemetry.ThermalObserver
+import com.mrun1corn.powerwarden.telemetry.BatteryProbe
+import com.mrun1corn.powerwarden.telemetry.ScreenObserver
+import com.mrun1corn.powerwarden.telemetry.ThermalObserver
 import kotlinx.coroutines.*
 
 /**
@@ -36,8 +36,8 @@ class PowerWardenService : Service() {
     companion object {
         const val CHANNEL_ID = "power_warden_sentinel"
         const val NOTIFICATION_ID = 8001
-        const val ACTION_START = "com.powerwarden.action.START"
-        const val ACTION_STOP = "com.powerwarden.action.STOP"
+        const val ACTION_START = "com.mrun1corn.powerwarden.action.START"
+        const val ACTION_STOP = "com.mrun1corn.powerwarden.action.STOP"
 
         var listener: ((Map<String, Any>) -> Unit)? = null
 

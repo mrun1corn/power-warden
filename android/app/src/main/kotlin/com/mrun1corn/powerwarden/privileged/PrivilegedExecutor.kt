@@ -1,4 +1,4 @@
-package com.powerwarden.power_warden.privileged
+package com.mrun1corn.powerwarden.privileged
 
 import android.app.ActivityManager
 import android.content.Context
@@ -740,8 +740,8 @@ class PrivilegedExecutor(private val context: Context) {
 
         if (!hasShizukuElevated && !hasKadbElevated) {
             // Priority 1: Automated Accessibility Service (Zero-ADB, 100% automated 1-tap Force Stop)
-            if (com.powerwarden.power_warden.service.WardenAccessibilityService.isServiceRunning) {
-                return@withContext com.powerwarden.power_warden.service.WardenAccessibilityService.stopPackageAutomatically(packageName)
+            if (com.mrun1corn.powerwarden.service.WardenAccessibilityService.isServiceRunning) {
+                return@withContext com.mrun1corn.powerwarden.service.WardenAccessibilityService.stopPackageAutomatically(packageName)
             }
 
             // Priority 2: Direct user to Android's native App Info screen so they can manually tap Force Stop

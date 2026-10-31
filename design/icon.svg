@@ -1,0 +1,36 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0D1210"/>
+      <stop offset="1" stop-color="#000000"/>
+    </linearGradient>
+    <linearGradient id="charge" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#00B248"/>
+      <stop offset="0.7" stop-color="#00E676"/>
+      <stop offset="1" stop-color="#5CFFB0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background squircle -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+
+  <!-- Battery tip (terminal) -->
+  <rect x="216" y="70" width="80" height="34" rx="16" fill="#00E676" opacity="0.9"/>
+
+  <!-- Battery body: rounded, vertical, hero shape -->
+  <rect x="136" y="104" width="240" height="344" rx="64" fill="none"
+        stroke="#2A3B32" stroke-width="14"/>
+
+  <!-- Charge fill: rising gradient = charging/life -->
+  <clipPath id="body">
+    <rect x="143" y="111" width="226" height="330" rx="58"/>
+  </clipPath>
+  <g clip-path="url(#body)">
+    <rect x="143" y="111" width="226" height="330" fill="#0A0F0C"/>
+    <rect x="143" y="266" width="226" height="175" fill="url(#charge)"/>
+  </g>
+
+  <!-- Lightning bolt over the charge -->
+  <path d="M282 176 L 210 296 L 258 296 L 236 404 L 330 268 L 276 268 Z"
+        fill="#FFFFFF"/>
+</svg>
