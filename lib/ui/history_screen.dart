@@ -57,7 +57,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Future<void> _refreshSilently() async {
-    final sessions = await _database.getRecentSessions(limit: 60);
+    final sessions = await _database.getRecentSessions(limit: 200);
     final appUsage = await _telemetryService.getHistoricalAppUsage(days: 1);
     final samples = await _database.getRecentTelemetry(limit: 120);
     if (mounted) {
@@ -74,7 +74,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     // The initial load shows the spinner via _isLoading only when empty.
     await _database.initialize();
     _capacityMah = await _telemetryService.getCapacityMah();
-    final sessions = await _database.getRecentSessions(limit: 60);
+    final sessions = await _database.getRecentSessions(limit: 200);
     final appUsage = await _telemetryService.getHistoricalAppUsage(days: 1);
     final samples = await _database.getRecentTelemetry(limit: 120);
 

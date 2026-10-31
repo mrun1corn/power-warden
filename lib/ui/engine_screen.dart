@@ -464,12 +464,12 @@ class _EngineScreenState extends State<EngineScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Rolling 48-Hour Retention Engine',
+                        'Storage & Data Retention',
                         style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Telemetry samples are batched in memory and flushed every 15 minutes. Records older than 48 hours are automatically purged to prevent disk bloat.',
+                        'Your charge/drain history and incident log are kept forever. Only the fine-grained measurement points behind the charts are trimmed after 7 days to keep the app light.',
                         style: TextStyle(fontSize: 12, color: textMuted, height: 1.35),
                       ),
                       const SizedBox(height: 12),
@@ -481,7 +481,7 @@ class _EngineScreenState extends State<EngineScreen> {
                               await _database.pruneOldTelemetry();
                               messenger.showSnackBar(
                                 const SnackBar(
-                                  content: Text('✓ Pruned telemetry records older than 48 hours'),
+                                  content: Text('✓ Trimmed chart data older than 7 days'),
                                   duration: Duration(seconds: 2),
                                 ),
                               );
