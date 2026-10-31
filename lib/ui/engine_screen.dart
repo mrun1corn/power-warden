@@ -123,7 +123,7 @@ class _EngineScreenState extends State<EngineScreen> {
                   const Icon(Icons.shield_moon_rounded, color: AppTheme.chargingCyan, size: 22),
                   const SizedBox(width: 10),
                   Text(
-                    'OEM Sleep & Background Defense',
+                    'Keep Monitoring Alive on My Phone',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -385,7 +385,7 @@ class _EngineScreenState extends State<EngineScreen> {
                 const SizedBox(height: 20),
 
                 // Section 3: OEM Battery Optimization Exemption
-                _buildSectionHeader('OEM SLEEP & BACKGROUND DEFENSE', textMuted),
+                _buildSectionHeader('KEEP MONITORING ALIVE (OEM DEFENSE)', textMuted),
                 const SizedBox(height: 8),
                 _buildCard(
                   surfaceColor,
@@ -394,10 +394,10 @@ class _EngineScreenState extends State<EngineScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildStatusRow(
-                        title: 'Battery Optimization Exemption',
+                        title: 'Background Monitoring',
                         subtitle: !_isBatteryOptimized
-                            ? 'Exempted — sentinel runs 24/7 without interruption'
-                            : 'Not exempted — OEM may stop monitoring in the background',
+                            ? 'Protected — monitoring keeps running even when the screen is off'
+                            : 'At risk — your phone may stop PowerWarden to save battery',
                         isActive: !_isBatteryOptimized,
                         icon: Icons.battery_saver_rounded,
                         textColor: textColor,
@@ -405,51 +405,47 @@ class _EngineScreenState extends State<EngineScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Exempt PowerWarden from battery optimization so OEM task-killers (HyperOS/MIUI, One UI, ColorOS) don\'t stop the screen-off sentinel.',
+                        'Some phones force-close background apps to save battery. Allow PowerWarden to run in the background so it can watch for drain while your screen is off.',
                         style: TextStyle(fontSize: 12, color: textMuted, height: 1.35),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                await _telemetryService.requestIgnoreBatteryOptimizations();
-                                await _loadState();
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: isDark ? Colors.white : Colors.black,
-                                side: BorderSide(color: surfaceBorder),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                minimumSize: const Size(0, 44),
-                              ),
-                              child: const Text(
-                                'Exempt',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () async {
+                            await _telemetryService.requestIgnoreBatteryOptimizations();
+                            await _loadState();
+                          },
+                          icon: const Icon(Icons.battery_saver_rounded, size: 18),
+                          label: const Text(
+                            'Keep Monitoring On (Battery Exemption)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: _showVendorAutostartModal,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppTheme.chargingCyan,
-                                side: BorderSide(color: AppTheme.chargingCyan.withValues(alpha: 0.4)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                minimumSize: const Size(0, 44),
-                              ),
-                              child: const Text(
-                                'OEM Guides',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                        ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _showVendorAutostartModal,
+                          icon: const Icon(Icons.help_outline_rounded, size: 18),
+                          label: const Text(
+                            'How to Allow Background on My Phone',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.chargingCyan,
+                            side: BorderSide(color: AppTheme.chargingCyan.withValues(alpha: 0.4)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
                       ),
                     ],
                   ),
