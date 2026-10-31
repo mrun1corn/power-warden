@@ -639,7 +639,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 await _telemetryService.requestIgnoreBatteryOptimizations();
               },
               icon: const Icon(Icons.security_rounded, size: 16),
-              label: const Text('Allow Background Running & AutoStart'),
+              label: const Text('Exempt from Battery Optimization'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentGreen,
                 foregroundColor: Colors.black,

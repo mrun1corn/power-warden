@@ -123,7 +123,7 @@ class _EngineScreenState extends State<EngineScreen> {
                   const Icon(Icons.shield_moon_rounded, color: AppTheme.chargingCyan, size: 22),
                   const SizedBox(width: 10),
                   Text(
-                    'OEM Autostart & Killer Defense',
+                    'OEM Sleep & Background Defense',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -134,7 +134,7 @@ class _EngineScreenState extends State<EngineScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Aggressive OEM skins terminate background foreground services unless manually exempted in system security center:',
+                'Some OEM skins force-stop background apps to save power. For reliable 24/7 monitoring, mark PowerWarden as exempt in your device\'s power manager:',
                 style: TextStyle(
                   fontSize: 12.5,
                   color: isDark ? AppTheme.textSecondary : AppTheme.textSecondaryLight,
@@ -172,7 +172,7 @@ class _EngineScreenState extends State<EngineScreen> {
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: const Text('Open System Battery Optimization Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('Open Battery Optimization Settings', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -385,7 +385,7 @@ class _EngineScreenState extends State<EngineScreen> {
                 const SizedBox(height: 20),
 
                 // Section 3: OEM Battery Optimization Exemption
-                _buildSectionHeader('OEM SLEEP & KILLER DEFENSE', textMuted),
+                _buildSectionHeader('OEM SLEEP & BACKGROUND DEFENSE', textMuted),
                 const SizedBox(height: 8),
                 _buildCard(
                   surfaceColor,
@@ -394,10 +394,10 @@ class _EngineScreenState extends State<EngineScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildStatusRow(
-                        title: 'Battery Saver Exemption',
+                        title: 'Battery Optimization Exemption',
                         subtitle: !_isBatteryOptimized
-                            ? 'Exempted (Continuous background sentinel)'
-                            : 'Optimized by OEM (Risk of background kill)',
+                            ? 'Exempted — sentinel runs 24/7 without interruption'
+                            : 'Not exempted — OEM may stop monitoring in the background',
                         isActive: !_isBatteryOptimized,
                         icon: Icons.battery_saver_rounded,
                         textColor: textColor,
@@ -405,7 +405,7 @@ class _EngineScreenState extends State<EngineScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Exempts PowerWarden from aggressive OEM task-killers (MIUI/HyperOS, Samsung OneUI, ColorOS) to keep screen-off sentinel active.',
+                        'Exempt PowerWarden from battery optimization so OEM task-killers (HyperOS/MIUI, One UI, ColorOS) don\'t stop the screen-off sentinel.',
                         style: TextStyle(fontSize: 12, color: textMuted, height: 1.35),
                       ),
                       const SizedBox(height: 12),
@@ -422,7 +422,7 @@ class _EngineScreenState extends State<EngineScreen> {
                                 side: BorderSide(color: surfaceBorder),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
-                              child: const Text('Exempt Battery Saver'),
+                              child: const Text('Exempt from Battery Saver'),
                             ),
                           ),
                           const SizedBox(width: 8),
