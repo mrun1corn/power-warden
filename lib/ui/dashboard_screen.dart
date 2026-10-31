@@ -182,11 +182,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final startTime = _sessionStartTime;
       final duration = startTime != null ? now.difference(startTime) : Duration.zero;
 
-      // Save valid charging or discharging sessions (must be >= 45 seconds or gained/lost >= 1%)
+      // Save valid charging or discharging sessions (must run >= 2 minutes
+      // AND show >= 1% battery change — filters out transient spikes and
+      // 1-minute/1% noise that cluttered history).
       final startLvl = _sessionStartLevel ?? sample.batteryLevel;
       final deltaPercent = (sample.batteryLevel - startLvl).abs();
 
-      if (duration.inSeconds >= 45 || deltaPercent >= 1) {
+      if (duration.inSeconds >= 120 && deltaPercent >= 1) {
         final mahDelta = math.max(15, ((deltaPercent / 100.0) * _capacityMah).round());
         final topApp = _topProcesses.isNotEmpty
             ? (_topProcesses.first['name'] as String? ?? '')
