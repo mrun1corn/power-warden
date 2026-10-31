@@ -106,18 +106,24 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   /// Opens the full-screen detail view for a completed session.
+  /// Queries session-scoped telemetry from disk so charts stay populated even
+  /// after the in-memory sample ring buffer has rolled over.
   void _openSessionDetail(PowerSession session) {
     HapticFeedback.lightImpact();
-    final sessionSamples = _historicalSamples
-        .where((s) =>
-            !s.timestamp.isBefore(session.startTime) &&
-            !s.timestamp.isAfter(session.endTime.add(const Duration(minutes: 2))))
-        .toList();
+    _openSessionDetailAsync(session);
+  }
+
+  Future<void> _openSessionDetailAsync(PowerSession session) async {
+    final samples = await AppDatabase().getTelemetryForSession(
+      session.startTime,
+      session.endTime.add(const Duration(minutes: 2)),
+    );
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SessionDetailScreen(
           session: session,
-          sessionSamples: sessionSamples,
+          sessionSamples: samples,
         ),
       ),
     );

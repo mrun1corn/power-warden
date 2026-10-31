@@ -229,4 +229,33 @@ class AppDatabase {
     results.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return results;
   }
+
+  /// Retrieves telemetry samples for a specific session window, regardless of
+  /// how old they are — keeps session detail charts populated even after the
+  /// last-100-lines ring buffer has rolled over.
+  Future<List<TelemetrySample>> getTelemetryForSession(
+    DateTime startTime,
+    DateTime endTime, {
+    int limit = 200,
+  }) async {
+    final results = <TelemetrySample>[];
+    if (_telemetryFile != null && await _telemetryFile!.exists()) {
+      try {
+        final lines = await _telemetryFile!.readAsLines();
+        for (final line in lines) {
+          if (line.trim().isEmpty) continue;
+          try {
+            final map = jsonDecode(line) as Map<String, dynamic>;
+            final ts = DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int);
+            if (!ts.isBefore(startTime) && !ts.isAfter(endTime)) {
+              results.add(TelemetrySample.fromMap(map));
+              if (results.length >= limit) break;
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+    results.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return results;
+  }
 }
