@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../core/formatters.dart';
 import '../domain/models/power_session.dart';

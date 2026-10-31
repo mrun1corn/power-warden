@@ -10,11 +10,11 @@ import 'package:flutter/material.dart';
 /// screens that manage their own _busy flag.
 ///
 /// Usage in a StatefulWidget:
-///   bool _busy = false;
-///   Future<void> _onPressed() => runGuarded(this, () async { ... });
+///   `bool _busy = false;`
+///   `Future<void> _onPressed() => runGuarded(this, () async { ... });`
 ///
 /// Simplest usage — stateless double-click protection without a flag:
-///   onPressed: once(() async { ... })   // ignores taps while previous runs
+///   `onPressed: once(() async { ... })`   // ignores taps while previous runs
 class ActionGuard {
   ActionGuard._();
 
