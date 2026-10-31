@@ -862,6 +862,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 stateLabel = 'CALM';
               }
 
+              // Pre-resolved theme colors — avoids nested ternaries below.
+              final calmIconBg = isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight;
+              final calmIconColor = isDark ? AppTheme.textSecondary : AppTheme.textSecondaryLight;
+              final stopBgColor = isHeavy
+                  ? (isDark ? AppTheme.crimson : AppTheme.crimsonLight).withValues(alpha: 0.13)
+                  : calmIconBg;
+              final stopBorderColor = isHeavy
+                  ? (isDark ? AppTheme.crimson : AppTheme.crimsonLight).withValues(alpha: 0.4)
+                  : (isDark ? AppTheme.surfaceBorderDark : AppTheme.surfaceBorderLight);
+              final stopTextColor = isHeavy
+                  ? (isDark ? AppTheme.crimson : AppTheme.crimsonLight)
+                  : calmIconColor;
+
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
@@ -882,9 +895,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           decoration: BoxDecoration(
                             color: isHeavy
                                 ? stateColor.withValues(alpha: 0.15)
-                                : (isDark
-                                      ? AppTheme.surfaceVariantDark
-                                      : AppTheme.surfaceVariantLight),
+                                : calmIconBg,
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -894,9 +905,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             size: 15,
                             color: isHeavy
                                 ? stateColor
-                                : (isDark
-                                      ? AppTheme.textSecondary
-                                      : AppTheme.textSecondaryLight),
+                                : calmIconColor,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -979,37 +988,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   ),
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
-                                    color: isHeavy
-                                        ? (isDark
-                                              ? AppTheme.crimson
-                                              : AppTheme.crimsonLight)
-                                              .withValues(alpha: 0.13)
-                                        : (isDark
-                                              ? AppTheme.surfaceVariantDark
-                                              : AppTheme.surfaceVariantLight),
+                                    color: stopBgColor,
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: isHeavy
-                                          ? (isDark
-                                                ? AppTheme.crimson
-                                                : AppTheme.crimsonLight)
-                                                .withValues(alpha: 0.4)
-                                          : (isDark
-                                                ? AppTheme.surfaceBorderDark
-                                                : AppTheme.surfaceBorderLight),
+                                      color: stopBorderColor,
                                       width: 1,
                                     ),
                                   ),
                                   child: Text(
                                     'STOP',
                                     style: TextStyle(
-                                      color: isHeavy
-                                          ? (isDark
-                                                ? AppTheme.crimson
-                                                : AppTheme.crimsonLight)
-                                          : (isDark
-                                                ? AppTheme.textSecondary
-                                                : AppTheme.textSecondaryLight),
+                                      color: stopTextColor,
                                       fontSize: 10.5,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.5,
@@ -1064,9 +1053,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           style: TextStyle(
                             color: isHeavy
                                 ? stateColor
-                                : (isDark
-                                      ? AppTheme.textSecondary
-                                      : AppTheme.textSecondaryLight),
+                                : calmIconColor,
                             fontWeight: FontWeight.w600,
                             fontSize: 11,
                           ),

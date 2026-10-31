@@ -127,6 +127,10 @@ class DrainTimelineChart extends StatelessWidget {
                   clipData: const FlClipData.all(), // Prevents line and gradient fill from bleeding outside the chart bounding box!
                   minY: chartMinY,
                   maxY: chartMaxY,
+                  // Extend the x-domain so the 'Now' axis label at the last
+                  // sample has room inside the card instead of clipping.
+                  maxX: (currentSpots.length - 1) + 2.0,
+                  minX: -1.0,
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
@@ -162,12 +166,12 @@ class DrainTimelineChart extends StatelessWidget {
                               ),
                             );
                           } else if (idx >= effectiveSamples.length - 1) {
-                            // 'Now' label: centered in a fixed-width box so it
-                            // never bleeds past the card's right border.
+                            // 'Now' label: centered, fully inside the chart's
+                            // extended x-domain (no edge clipping).
                             return Padding(
                               padding: const EdgeInsets.only(top: 6.0),
                               child: SizedBox(
-                                width: 44,
+                                width: 48,
                                 child: Text(
                                   'Now',
                                   textAlign: TextAlign.center,
