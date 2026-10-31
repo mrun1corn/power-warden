@@ -1,4 +1,4 @@
-import 'package:fl_chart/fl_chart.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:flutter/material.dart';
 
 import '../core/formatters.dart';
@@ -102,18 +102,12 @@ class SessionDetailScreen extends StatelessWidget {
 
   Widget _buildChartCard(BuildContext context, Color accent, bool isCharging) {
     final theme = Theme.of(context);
-    final samples = sessionSamples;
-    final spots = <FlSpot>[];
-    final startMs = samples.first.timestamp.millisecondsSinceEpoch;
-    for (final s in samples) {
-      spots.add(FlSpot(
-        (s.timestamp.millisecondsSinceEpoch - startMs) / 60000.0,
-        s.currentMilliamps.abs().toDouble(),
-      ));
-    }
-
-    final maxMa = spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
-    final chartMaxY = (maxMa * 1.2).clamp(100, 8000).toDouble();
+    final samples = sessionSamples.reversed.toList();
+    final maxMa =
+        (samples.map((e) => e.currentMilliamps.abs().toDouble())
+                .reduce((a, b) => a > b ? a : b) *
+            1.2)
+        .clamp(100, 8000);
 
     return Card(
       child: Padding(
@@ -128,91 +122,60 @@ class SessionDetailScreen extends StatelessWidget {
             const SizedBox(height: 12),
             SizedBox(
               height: 180,
-              child: LineChart(
-                LineChartData(
-                  minY: 0,
-                  maxY: chartMaxY,
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: chartMaxY / 4,
-                    getDrawingHorizontalLine: (v) => FlLine(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.4),
-                      strokeWidth: 1,
-                    ),
+              child: SfCartesianChart(
+                plotAreaBorderWidth: 0,
+                primaryXAxis: CategoryAxis(
+                  labelStyle: TextStyle(
+                    color: theme.textTheme.bodySmall?.color,
+                    fontSize: 9,
                   ),
-                  titlesData: FlTitlesData(
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 24,
-                        interval: _niceInterval(spots.last.x),
-                        getTitlesWidget: (v, meta) => Text(
-                          '${v.toInt()}m',
-                          style: theme.textTheme.labelSmall,
-                        ),
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 40,
-                        interval: chartMaxY / 4,
-                        getTitlesWidget: (v, meta) => Text(
-                          v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}A' : '${v.toInt()}',
-                          style: theme.textTheme.labelSmall,
-                        ),
-                      ),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  lineTouchData: LineTouchData(
-                    touchTooltipData: LineTouchTooltipData(
-                      getTooltipColor: (spot) => theme.colorScheme.surfaceContainerHighest,
-                    ),
-                    getTouchedSpotIndicator: (bar, spots) => [
-                      TouchedSpotIndicatorData(
-                        FlLine(color: accent, strokeWidth: 2),
-                        FlDotData(
-                          getDotPainter: (p, pct, bar, i) => FlDotCirclePainter(
-                            radius: 4,
-                            color: accent,
-                            strokeWidth: 0,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: spots,
-                      isCurved: true,
-                      curveSmoothness: 0.3,
-                      preventCurveOverShooting: true,
-                      color: accent,
-                      barWidth: 2,
-                      isStrokeCapRound: true,
-                      dotData: const FlDotData(show: false),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: accent.withValues(alpha: 0.08),
-                      ),
-                    ),
-                  ],
+                  majorTickLines: const MajorTickLines(size: 0),
+                  axisLine: const AxisLine(width: 0),
+                  labelAlignment: LabelAlignment.center,
+                  majorGridLines: const MajorGridLines(width: 0),
                 ),
+                primaryYAxis: NumericAxis(
+                  minimum: 0,
+                  maximum: maxMa.toDouble(),
+                  labelStyle: TextStyle(
+                    color: theme.textTheme.bodySmall?.color,
+                    fontSize: 9,
+                  ),
+                  majorTickLines: const MajorTickLines(size: 4),
+                  axisLine: const AxisLine(width: 0.5),
+                  labelFormat: '{value}mA',
+                  majorGridLines: MajorGridLines(
+                    color: theme.dividerTheme.color?.withValues(alpha: 0.4),
+                    width: 0.5,
+                  ),
+                ),
+                tooltipBehavior: TooltipBehavior(
+                  enable: true,
+                  header: '',
+                  format: 'point.x\npoint.y mA',
+                  canShowMarker: false,
+                ),
+                series: <CartesianSeries<TelemetrySample, String>>[
+                  LineSeries<TelemetrySample, String>(
+                    dataSource: samples,
+                    xValueMapper: (TelemetrySample sample, _) =>
+                        PowerFormatters.timestamp(sample.timestamp),
+                    yValueMapper: (TelemetrySample sample, _) =>
+                        sample.currentMilliamps.abs().toDouble(),
+                    name: isCharging ? 'Charge Input' : 'Drain Current',
+                    color: accent,
+                    width: 2,
+                    markerSettings: const MarkerSettings(isVisible: false),
+                    enableTooltip: true,
+                    animationDuration: 600,
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  double _niceInterval(double maxX) {
-    if (maxX <= 0) return 1;
-    return (maxX / 4).roundToDouble().clamp(1, double.infinity);
   }
 
   Widget _buildStatGrid(BuildContext context, Color accent, bool isCharging) {
