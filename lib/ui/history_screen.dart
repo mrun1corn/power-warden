@@ -156,12 +156,11 @@ class _HistoryScreenState extends State<HistoryScreen>
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Center(
                   child: SegmentedButton<_HistoryRange>(
-                    style: ButtonStyle(
-                      visualDensity: VisualDensity.compact,
-                      padding: const WidgetStatePropertyAll(
-                        EdgeInsets.symmetric(horizontal: 18, vertical: 0),
+                    style: const ButtonStyle(
+                      padding: WidgetStatePropertyAll(
+                        EdgeInsets.symmetric(horizontal: 18),
                       ),
-                      textStyle: const WidgetStatePropertyAll(
+                      textStyle: WidgetStatePropertyAll(
                         TextStyle(fontSize: 13, height: 1.0),
                       ),
                     ),
