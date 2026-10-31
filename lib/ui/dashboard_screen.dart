@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../core/action_guard.dart';
 import '../domain/anomaly_engine.dart';
 import '../domain/models/anomaly_incident.dart';
 import '../domain/models/power_session.dart';
@@ -379,7 +380,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () async {
+                      onPressed: () => guarded(() async {
                         Navigator.pop(ctx);
                         final messenger = ScaffoldMessenger.of(context);
                         final ok = await _telemetryService.remediateApp(pkg);
@@ -402,7 +403,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           );
                         }
-                      },
+                      }, errorTitle: 'Could not force-stop $name'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.crimson,
                         foregroundColor: Colors.white,

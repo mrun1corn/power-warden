@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/action_guard.dart';
 import '../../data/database/database.dart';
 import '../../main.dart';
 import '../../services/telemetry_service.dart';
@@ -163,10 +164,10 @@ class _EngineScreenState extends State<EngineScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () async {
+                  onPressed: () => guarded(() async {
                     Navigator.pop(ctx);
                     await _telemetryService.requestIgnoreBatteryOptimizations();
-                  },
+                  }, errorTitle: 'Could not open battery settings'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.accentGreen,
                     foregroundColor: Colors.black,
@@ -368,10 +369,10 @@ class _EngineScreenState extends State<EngineScreen> {
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton(
-                        onPressed: () async {
+                        onPressed: () => guarded(() async {
                           await _telemetryService.openAccessibilitySettings();
                           await _loadState();
-                        },
+                        }, errorTitle: 'Could not open accessibility settings'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: isDark ? Colors.white : Colors.black,
                           side: BorderSide(color: surfaceBorder),
@@ -412,10 +413,11 @@ class _EngineScreenState extends State<EngineScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
-                          onPressed: () async {
-                            await _telemetryService.requestIgnoreBatteryOptimizations();
+                          onPressed: () => guarded(() async {
+                            await _telemetryService
+                                .requestIgnoreBatteryOptimizations();
                             await _loadState();
-                          },
+                          }, errorTitle: 'Could not open battery settings'),
                           icon: const Icon(Icons.battery_saver_rounded, size: 18),
                           label: const Text(
                             'Keep Monitoring On (Battery Exemption)',
@@ -474,7 +476,7 @@ class _EngineScreenState extends State<EngineScreen> {
                       Row(
                         children: [
                           OutlinedButton.icon(
-                            onPressed: () async {
+                            onPressed: () => guarded(() async {
                               final messenger = ScaffoldMessenger.of(context);
                               await _database.pruneOldTelemetry();
                               messenger.showSnackBar(
@@ -483,7 +485,7 @@ class _EngineScreenState extends State<EngineScreen> {
                                   duration: Duration(seconds: 2),
                                 ),
                               );
-                            },
+                            }, errorTitle: 'Pruning failed'),
                             icon: const Icon(Icons.cleaning_services_rounded, size: 16),
                             label: const Text('Prune Stale Data'),
                             style: OutlinedButton.styleFrom(

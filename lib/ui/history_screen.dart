@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/action_guard.dart';
 import '../../core/formatters.dart';
 import '../../data/database/database.dart';
 import '../../domain/models/power_session.dart';
@@ -635,9 +636,9 @@ class _HistoryScreenState extends State<HistoryScreen>
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: () async {
+              onPressed: () => guarded(() async {
                 await _telemetryService.requestIgnoreBatteryOptimizations();
-              },
+              }, errorTitle: 'Could not open battery settings'),
               icon: const Icon(Icons.security_rounded, size: 16),
               label: const Text('Allow Background Monitoring', maxLines: 1, overflow: TextOverflow.ellipsis),
               style: ElevatedButton.styleFrom(
