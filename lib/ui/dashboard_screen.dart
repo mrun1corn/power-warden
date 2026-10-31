@@ -261,9 +261,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           p['cpuMah'] = stats['cpuMah'];
           p['wakeMah'] = stats['wakeMah'];
           p['wifiMah'] = stats['wifiMah'];
+          p['powerSource'] = stats['source'];
         }
       }
     }
+
+    // Sort: apps with real battery attribution first, then by CPU
+    procs.sort((a, b) {
+      final aMah = (a['drainMah'] as num?)?.toDouble() ?? 0;
+      final bMah = (b['drainMah'] as num?)?.toDouble() ?? 0;
+      if (aMah != bMah) return bMah.compareTo(aMah);
+      final aCpu = (a['cpuPercent'] as num?)?.toDouble() ?? 0;
+      final bCpu = (b['cpuPercent'] as num?)?.toDouble() ?? 0;
+      return bCpu.compareTo(aCpu);
+    });
 
     if (mounted) {
       setState(() {
@@ -715,13 +726,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Icon(Icons.apps_rounded, size: 16, color: textMuted),
             const SizedBox(width: 6),
             Text(
-              'ACTIVE APP ENERGY CONSUMPTION',
+              'APP BATTERY USE (ESTIMATED)',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.0,
                 color: textMuted,
               ),
+            ),
+            const SizedBox(width: 4),
+            Tooltip(
+              message:
+                  'Per-app power is estimated by Android\'s power model from CPU, wakelock, and radio usage. Total device drain is measured directly from the battery sensor.',
+              child: Icon(Icons.info_outline_rounded, size: 13, color: textMuted),
             ),
             const Spacer(),
             if (_isLoadingProcesses)
@@ -1020,7 +1037,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                '~$appEstimatedMa mA',
+                                '~$appEstimatedMa mA est.',
                                 style: const TextStyle(
                                   color: AppTheme.chargingCyan,
                                   fontWeight: FontWeight.bold,
@@ -1069,7 +1086,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               border: Border.all(color: surfaceBorder),
                             ),
                             child: Text(
-                              'Total: ${(proc['drainMah'] as num).toStringAsFixed(1)} mAh',
+                              'Since last charge: ${(proc['drainMah'] as num).toStringAsFixed(1)} mAh (est.)',
                               style: TextStyle(color: textMuted, fontSize: 9.5, fontWeight: FontWeight.w600),
                             ),
                           ),

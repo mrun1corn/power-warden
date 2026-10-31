@@ -246,7 +246,16 @@ class MainActivity : FlutterActivity() {
                 }
                 "getEstimatedAppPowerStats" -> {
                     activityScope.launch {
-                        val stats = privilegedExecutor.getEstimatedAppPowerStats()
+                        // Elevated path first (Kadb OR Shizuku — transport-agnostic):
+                        // runs dumpsys through whichever shell is active.
+                        // Fallback: unprivileged UsageStats-based estimate.
+                        var stats: Map<String, Map<String, Any>> = privilegedExecutor.getModernBatteryUsageStats()
+                        if (stats.isEmpty()) {
+                            val fallback = privilegedExecutor.getEstimatedAppPowerStats()
+                            stats = fallback.mapValues { (_, v) ->
+                                v.mapKeys { (k, _) -> k }.mapValues { (_, v2) -> v2 as Any }
+                            }
+                        }
                         result.success(stats)
                     }
                 }

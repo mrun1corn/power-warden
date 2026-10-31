@@ -146,17 +146,25 @@ class TelemetryService {
     return [];
   }
 
-  /// Retrieves subsystem power consumption (CPU, Wakelock, Wi-Fi) directly from `dumpsys batterystats`.
-  Future<Map<String, Map<String, double>>> getEstimatedAppPowerStats() async {
+  /// Retrieves subsystem power consumption (CPU, Wakelock, Wi-Fi).
+/// Source: Android 14+ BatteryUsageStats API when available, else dumpsys parsing.
+/// NOTE: per-app mAh is an Android power-model ESTIMATE, not a measurement.
+Future<Map<String, Map<String, dynamic>>> getEstimatedAppPowerStats() async {
     try {
       final res = await _methodChannel.invokeMethod<Map<dynamic, dynamic>>('getEstimatedAppPowerStats');
       if (res != null) {
-        final converted = <String, Map<String, double>>{};
+        final converted = <String, Map<String, dynamic>>{};
         res.forEach((key, value) {
           if (value is Map) {
-            converted[key.toString()] = Map<String, double>.from(
-              value.map((k, v) => MapEntry(k.toString(), (v as num).toDouble())),
-            );
+            final entry = <String, dynamic>{};
+            value.forEach((k, v) {
+              if (k.toString() == 'source') {
+                entry['source'] = v.toString();
+              } else if (v is num) {
+                entry[k.toString()] = v.toDouble();
+              }
+            });
+            converted[key.toString()] = entry;
           }
         });
         return converted;
