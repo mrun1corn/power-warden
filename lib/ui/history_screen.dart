@@ -69,7 +69,8 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Future<void> _loadAllHistory() async {
-    setState(() => _isLoading = true);
+    // Silent refresh: never blank the screen with a spinner on re-loads.
+    // The initial load shows the spinner via _isLoading only when empty.
     await _database.initialize();
     _capacityMah = await _telemetryService.getCapacityMah();
     final sessions = await _database.getRecentSessions(limit: 60);
@@ -146,25 +147,23 @@ class _HistoryScreenState extends State<HistoryScreen>
           'Power History',
           style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadAllHistory,
-            tooltip: 'Refresh History',
-          ),
-          const SizedBox(width: 8),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(98),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Center(
                   child: SegmentedButton<_HistoryRange>(
-                    style: const ButtonStyle(
+                    style: ButtonStyle(
                       visualDensity: VisualDensity.compact,
+                      padding: const WidgetStatePropertyAll(
+                        EdgeInsets.symmetric(horizontal: 18, vertical: 0),
+                      ),
+                      textStyle: const WidgetStatePropertyAll(
+                        TextStyle(fontSize: 13, height: 1.0),
+                      ),
                     ),
                     selected: {_range},
                     onSelectionChanged: (sel) {

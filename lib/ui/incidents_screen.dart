@@ -28,7 +28,8 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
+    // Silent refresh after the first load — no spinner flash on pull-to-refresh
+    if (_incidents.isEmpty) setState(() => _isLoading = true);
     final incidents = await widget.loadIncidents();
     if (mounted) {
       setState(() {
@@ -44,12 +45,6 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Incident Log'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
