@@ -47,6 +47,8 @@ local.properties
 # Tooling & Agent Caches
 .repowise/
 graphify-out/
+.sonar/
+coverage/
 
 # Gradle distributions and binaries accidentally placed in android
 android/gradle-[0-9]*/

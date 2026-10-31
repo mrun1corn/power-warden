@@ -36,6 +36,24 @@ jobs:
       - name: Run Unit Tests
         run: flutter test
 
+      - name: Generate Test Coverage
+        run: flutter test --coverage
+
+      - name: SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=mrun1corn_power-warden \
+            -Dsonar.projectName=PowerWarden \
+            -Dsonar.projectVersion=1.0.0 \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.organization=mrun1corn \
+            -Dsonar.sources=lib,android/app/src/main/kotlin \
+            -Dsonar.tests=test \
+            -Dsonar.coverage.lcov.reportPaths=coverage/lcov.info \
+            -Dsonar.exclusions=**/*.g.dart,**/*.freezed.dart,**/generated/**,android/app/src/main/res/**,build/**,.dart_tool/**
+
       - name: Build Android Release Split APKs
         run: flutter build apk --release --split-per-abi
 
