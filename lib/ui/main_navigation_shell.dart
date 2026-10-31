@@ -72,7 +72,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 color: AppTheme.accentGreen,
                 size: 22,
               ),
-              label: 'Sentinel',
+              label: 'Live',
             ),
             NavigationDestination(
               icon: Icon(Icons.report_outlined, color: unselected, size: 22),
@@ -81,7 +81,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 color: AppTheme.accentGreen,
                 size: 22,
               ),
-              label: 'Incidents',
+              label: 'Issues',
             ),
             NavigationDestination(
               icon: Icon(Icons.history_rounded, color: unselected, size: 22),

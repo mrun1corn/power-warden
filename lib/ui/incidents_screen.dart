@@ -44,7 +44,7 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Incident Log'),
+        title: const Text('Detected Issues'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -59,13 +59,13 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                             color: AppTheme.healthColor(theme.brightness).withValues(alpha: 0.5)),
                         const SizedBox(height: 16),
                         Text(
-                          'No incidents detected',
+                          'No issues detected',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.titleLarge,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'The sentinel is watching. Any runaway drain,\nthermal event, or rogue process will be logged here.',
+                          'All clear — nothing unusual detected.\nBattery drain spikes, overheating, and misbehaving apps\nwill be recorded here automatically.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium,
                         ),
