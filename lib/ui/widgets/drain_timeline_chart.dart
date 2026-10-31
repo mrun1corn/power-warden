@@ -151,9 +151,10 @@ class DrainTimelineChart extends StatelessWidget {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 26,
-                        interval: (effectiveSamples.length > 20
-                            ? (effectiveSamples.length / 3.0)
-                            : 10.0),
+                        // Divide the domain so a tick always lands exactly on
+                        // the last sample (where the 'Now' label lives).
+                        interval: ((effectiveSamples.length - 1) / 2.0)
+                            .clamp(1.0, double.infinity),
                         getTitlesWidget: (val, meta) {
                           final idx = val.toInt();
                           if (idx == 0) {
