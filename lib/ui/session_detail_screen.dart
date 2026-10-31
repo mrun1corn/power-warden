@@ -43,10 +43,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           _buildHeaderCard(context, accent, isCharging),
           const SizedBox(height: 16),
           if (widget.sessionSamples.length >= 2) ...[
-            _buildChartCard(context, accent, isCharging),
+            _buildChartCard(context, accent, isCharging, widget.sessionSamples),
             const SizedBox(height: 16),
           ],
-          _buildStatGrid(context, accent, isCharging),
+          _buildStatGrid(context, accent, isCharging, widget.sessionSamples),
           const SizedBox(height: 16),
           if (widget.session.topAppName.isNotEmpty) _buildTopAppCard(context),
           const SizedBox(height: 24),
@@ -107,15 +107,18 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  Widget _buildChartCard(BuildContext context, Color accent, bool isCharging) {
+  Widget _buildChartCard(BuildContext context, Color accent, bool isCharging, List<TelemetrySample> samples) {
     final theme = Theme.of(context);
-    final samples = widget.sessionSamples.reversed.toList();
-    final maxMa = (samples
-            .map((e) => e.currentMilliamps.abs().toDouble())
-            .reduce((a, b) => a > b ? a : b) *
-        1.2)
-        .clamp(100, 8000)
-        .toDouble();
+    final hasData = samples.length >= 2;
+
+    final maxMa = hasData
+        ? (samples
+                .map((e) => e.currentMilliamps.abs().toDouble())
+                .reduce((a, b) => a > b ? a : b) *
+            1.2)
+            .clamp(100, 8000)
+            .toDouble()
+        : 1000.0;
 
     return Card(
       child: Padding(
@@ -130,40 +133,51 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             const SizedBox(height: 12),
             SizedBox(
               height: 180,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapUp: (details) {
-                  final box = context.findRenderObject() as RenderBox;
-                  final local = box.globalToLocal(details.globalPosition);
-                  final width = box.size.width;
-                  
-                  final plotLeft = 44.0;
-                  final plotRight = width - 4.0;
-                  final m = samples.length;
-                  if (local.dx >= plotLeft && local.dx <= plotRight) {
-                    final t = (local.dx - plotLeft) / (plotRight - plotLeft);
-                    final idx = (t * (m - 1)).round().clamp(0, m - 1);
-                    setState(() => _sessionHoverIndex = idx);
-                  }
-                },
-                child: CustomPaint(
-                  size: Size.infinite,
-                  painter: _SessionChartPainter(
-                    samples: samples,
-                    maxY: maxMa,
-                    primaryColor: accent,
-                    hoverIndex: _sessionHoverIndex,
-                  ),
-                ),
-              ),
-            ),
+              child: hasData
+                  ? GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (details) {
+                        final box = context.findRenderObject() as RenderBox;
+                        final local = box.globalToLocal(details.globalPosition);
+                        final width = box.size.width;
+                        final plotLeft = 44.0;
+                        final plotRight = width - 4.0;
+                        final m = samples.length;
+                        if (local.dx >= plotLeft && local.dx <= plotRight) {
+                          final t = (local.dx - plotLeft) / (plotRight - plotLeft);
+                          final idx = (t * (m - 1)).round().clamp(0, m - 1);
+                          setState(() => _sessionHoverIndex = idx);
+                        }
+                      },
+                      child: CustomPaint(
+                        size: Size.infinite,
+                        painter: _SessionChartPainter(
+                          samples: samples,
+                          maxY: maxMa,
+                          primaryColor: accent,
+                          hoverIndex: _sessionHoverIndex,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Current trace not available for this window',
+                        style: TextStyle(
+                          color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                      ),
+                    ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatGrid(BuildContext context, Color accent, bool isCharging) {
+
+  Widget _buildStatGrid(BuildContext context, Color accent, bool isCharging, List<TelemetrySample> samples) {
     final theme = Theme.of(context);
     final stats = <(String, String, IconData)>[
       (

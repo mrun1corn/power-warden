@@ -281,6 +281,15 @@ class _HistoryScreenState extends State<HistoryScreen>
 
     // Fallback: If no sessions recorded yet, reconstruct session from recent historical samples
     final effectiveSessions = List<PowerSession>.from(sessions);
+
+    // When a live session is showing, hide any DB-recorded session that
+    // overlaps the live window so the same drain/charge cycle isn't listed twice.
+    if (isLiveNow && _historicalSamples.isNotEmpty) {
+      final liveStart = _historicalSamples.first.timestamp;
+      effectiveSessions.removeWhere((s) =>
+          s.startTime.isAfter(liveStart.subtract(const Duration(minutes: 2))));
+    }
+
     if (effectiveSessions.isEmpty && _historicalSamples.isNotEmpty) {
       final matchingSamples = _historicalSamples
           .where((s) => isChargingTab ? s.isCharging : !s.isCharging)
