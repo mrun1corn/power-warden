@@ -731,18 +731,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   strokeWidth: 2,
                   color: AppTheme.accentGreen,
                 ),
-              )
-            else
-              InkWell(
-                onTap: _loadProcesses,
-                child: const Text(
-                  'Refresh',
-                  style: TextStyle(
-                    color: AppTheme.chargingCyan,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
               ),
           ],
         ),
@@ -757,7 +745,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: Center(
               child: Text(
-                'No heavy apps consuming active CPU cycles.\nTap refresh or authorize Shizuku for deep inspection.',
+                'No heavy apps consuming active CPU cycles.\nPull down to refresh or authorize Shizuku for deep inspection.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: textMuted, fontSize: 12),
               ),

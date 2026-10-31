@@ -215,14 +215,6 @@ class _EngineScreenState extends State<EngineScreen> {
           'Engine & Settings',
           style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadState,
-            tooltip: 'Refresh Status',
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentGreen))
