@@ -167,41 +167,43 @@ class BatteryProbe(private val context: Context) {
         return 0L
     }
 
-    /**
-     * Normalizes raw current:
-     * 1. Scaling: Detects if OEM reports microamperes (uA) or milliamperes (mA).
-     *    Standard AOSP is uA (e.g. 350,000 uA = 350 mA).
-     *    Samsung/Realme/Huawei often report mA directly (e.g. 350).
-     *    If |raw| >= 10,000 -> divide by 1000.
-     * 2. Sign Convention:
-     *    Standardized so Positive = Discharging (Drain rate in mA), Negative = Charging.
-     */
-    fun normalizeCurrent(raw: Long, isCharging: Boolean): Int {
-        if (raw == 0L || raw == Long.MIN_VALUE || raw == Long.MAX_VALUE) {
-            return 0
+    companion object {
+        /** Anything above this is a sensor fault, not a plausible phone draw. */
+        const val MAX_PLAUSIBLE_MA = 20_000
+
+        /**
+         * Normalizes a raw CURRENT_NOW reading into the app-wide contract:
+         *
+         *   positive = discharging (drain in mA)
+         *   negative = charging (input in mA)
+         *
+         * Two OEM differences are absorbed here:
+         *
+         * 1. **Scale.** AOSP reports microamperes (350_000 uA = 350 mA) while
+         *    Samsung / Realme / Huawei report milliamperes directly (350). Any
+         *    |raw| >= 10_000 is treated as uA and divided by 1000.
+         *
+         * 2. **Sign.** Kernels disagree on polarity: AOSP's convention is
+         *    *negative* while discharging, some OEMs always report a positive
+         *    magnitude, others flip when a charger is attached. The raw sign is
+         *    therefore NOT trusted for direction. Only the magnitude is taken
+         *    from the sensor; direction comes from the framework's charger
+         *    state ([isCharging]), which is derived from ACTION_BATTERY_CHANGED
+         *    EXTRA_STATUS and is consistent across every OEM.
+         *
+         * Regressing this function silently disables all anomaly detection,
+         * because AnomalyEngine compares signed mA against drain thresholds.
+         */
+        fun normalizeCurrent(raw: Long, isCharging: Boolean): Int {
+            if (raw == 0L || raw == Long.MIN_VALUE || raw == Long.MAX_VALUE) {
+                return 0
+            }
+
+            val absVal = abs(raw)
+            val scaledMa = if (absVal >= 10_000L) absVal / 1000.0 else absVal.toDouble()
+            val magnitude = Math.round(scaledMa).toInt().coerceIn(0, MAX_PLAUSIBLE_MA)
+
+            return if (isCharging) -magnitude else magnitude
         }
-
-        val absVal = abs(raw)
-        val scaledMa = if (absVal >= 10_000L) {
-            absVal / 1000.0
-        } else {
-            absVal.toDouble()
-        }
-
-        val roundedMa = Math.round(scaledMa).toInt()
-
-        // Enforce consistent polarity: Positive = Draining, Negative = Charging
-        // If raw current itself was negative and not in charging state, or isCharging is explicitly true
-        return if (isCharging || raw < 0L && scaledMa > 50.0 && !isRawDischarging()) {
-            -roundedMa
-        } else {
-            roundedMa
-        }
-    }
-
-    private fun isRawDischarging(): Boolean {
-        // Polarity is normalized upstream by cross-checking the charging status
-        // in readInstantaneousSample(); no additional raw-polarity heuristic needed.
-        return false
     }
 }

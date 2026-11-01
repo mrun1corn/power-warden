@@ -29,6 +29,7 @@ class PowerWardenService : Service() {
     private lateinit var batteryProbe: BatteryProbe
     private lateinit var thermalObserver: ThermalObserver
     private lateinit var screenObserver: ScreenObserver
+    private lateinit var anomalyDetector: AnomalyDetector
 
     private var isRunning = false
     private val handler = Handler(Looper.getMainLooper())
@@ -38,6 +39,12 @@ class PowerWardenService : Service() {
         const val NOTIFICATION_ID = 8001
         const val ACTION_START = "com.mrun1corn.powerwarden.action.START"
         const val ACTION_STOP = "com.mrun1corn.powerwarden.action.STOP"
+
+        /** Flush buffered telemetry after this many samples. */
+        const val TELEMETRY_FLUSH_SAMPLES = 10
+
+        /** …or after this long, whichever comes first. */
+        const val TELEMETRY_FLUSH_INTERVAL_MS = 60_000L
 
         var listener: ((Map<String, Any>) -> Unit)? = null
 
@@ -147,8 +154,12 @@ class PowerWardenService : Service() {
         val endLevel = (metrics["batteryLevel"] as? Int) ?: sessionStartLevel
         val deltaPercent = Math.abs(endLevel - sessionStartLevel)
 
-        // Persist only meaningful sessions (>= 45s or >= 1% SOC change)
-        if (durationMs >= 45_000L || deltaPercent >= 1) {
+        // Persist only meaningful cycles: both a real duration AND real battery
+        // movement. The old "45s OR 1%" gate let 45-second blips into history,
+        // which is what made the History tab look like noise.
+        val isMeaningful = durationMs >= DrainThresholds.MIN_SESSION_DURATION_MS &&
+            deltaPercent >= DrainThresholds.MIN_SESSION_DELTA_PERCENT
+        if (isMeaningful) {
             val capacityMah = batteryProbe.getCapacityMah()
             val mahDelta = Math.max(
                 15,
@@ -178,6 +189,7 @@ class PowerWardenService : Service() {
     override fun onCreate() {
         super.onCreate()
         batteryProbe = BatteryProbe(this)
+        anomalyDetector = AnomalyDetector(this)
         thermalObserver = ThermalObserver(this) {}
         screenObserver = ScreenObserver(this) { isScreenOn, sleepDurationMs ->
             // Native Standby Sleep Session Persistence
@@ -187,8 +199,12 @@ class PowerWardenService : Service() {
                 val snap = batteryProbe.readInstantaneousSample()
                 sleepStartLevel = snap.batteryLevel
                 sleepStartTemp = snap.temperatureCelsius
-            } else if (sleepDurationMs >= 60_000L && sleepStartTimeMs > 0L) {
-                // Phone woke up after resting for >= 1 minute (or whole night)
+            } else if (sleepDurationMs >= DrainThresholds.MIN_STANDBY_DURATION_MS &&
+                sleepStartTimeMs > 0L
+            ) {
+                // Phone woke up after a real rest (>= 10 min). Shorter screen-off
+                // gaps are pocket time, not standby sleep, and used to flood the
+                // Standby tab with 1-minute "sleep" entries.
                 val wakeTime = System.currentTimeMillis()
                 val snap = batteryProbe.readInstantaneousSample()
                 val deltaLevel = Math.abs(snap.batteryLevel - sleepStartLevel)
@@ -287,26 +303,61 @@ class PowerWardenService : Service() {
         }
     }
 
+    /**
+     * Batched telemetry writer.
+     *
+     * The foreground service is the ONLY writer of `telemetry_samples.jsonl`
+     * (the Flutter layer used to append the same samples a second time).
+     * Writes are buffered so a 2 s screen-on tick does not mean a flash write
+     * every 2 s: flush at 10 samples, or every 60 s, whichever comes first.
+     */
+    private val telemetryBuffer = ArrayDeque<String>()
+    private var lastTelemetryFlushMs = 0L
+
     private fun logNativeTelemetrySample(metrics: Map<String, Any>) {
+        val json = org.json.JSONObject().apply {
+            put("timestamp", metrics["timestamp"] ?: System.currentTimeMillis())
+            put("batteryLevel", metrics["batteryLevel"] ?: 50)
+            put("currentMilliamps", metrics["currentMa"] ?: 0)
+            put("temperatureCelsius", metrics["temperatureCelsius"] ?: 30.0)
+            put("thermalStatus", metrics["thermalStatus"] ?: 0)
+            put("isScreenOn", metrics["isScreenOn"] ?: true)
+            put("isCharging", metrics["isCharging"] ?: false)
+            put("voltageMv", metrics["voltageMv"] ?: 4000)
+            put("sleepDurationMs", metrics["sleepDurationMs"] ?: 0)
+            put("refreshRate", metrics["refreshRate"] ?: 60.0)
+        }
+        telemetryBuffer.addLast(json.toString())
+
+        val now = System.currentTimeMillis()
+        val due = telemetryBuffer.size >= TELEMETRY_FLUSH_SAMPLES ||
+            now - lastTelemetryFlushMs >= TELEMETRY_FLUSH_INTERVAL_MS
+        if (due) flushTelemetryBuffer(now)
+    }
+
+    private fun flushTelemetryBuffer(now: Long = System.currentTimeMillis()) {
+        if (telemetryBuffer.isEmpty()) return
+        val payload = telemetryBuffer.joinToString(separator = "\n", postfix = "\n")
+        telemetryBuffer.clear()
+        lastTelemetryFlushMs = now
         serviceScope.launch(Dispatchers.IO) {
             try {
-                val dbDir = getDatabaseDir(applicationContext)
-                val file = java.io.File(dbDir, "telemetry_samples.jsonl")
-                val json = org.json.JSONObject().apply {
-                    put("timestamp", metrics["timestamp"] ?: System.currentTimeMillis())
-                    put("batteryLevel", metrics["batteryLevel"] ?: 50)
-                    put("currentMilliamps", metrics["currentMa"] ?: 0)
-                    put("temperatureCelsius", metrics["temperatureCelsius"] ?: 30.0)
-                    put("thermalStatus", metrics["thermalStatus"] ?: 0)
-                    put("isScreenOn", metrics["isScreenOn"] ?: true)
-                    put("isCharging", metrics["isCharging"] ?: false)
-                    put("voltageMv", metrics["voltageMv"] ?: 4000)
-                    put("sleepDurationMs", metrics["sleepDurationMs"] ?: 0)
-                    put("refreshRate", metrics["refreshRate"] ?: 60.0)
-                }
-                file.appendText(json.toString() + "\n")
+                java.io.File(getDatabaseDir(applicationContext), "telemetry_samples.jsonl")
+                    .appendText(payload)
             } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
         }
+    }
+
+    /** Synchronous variant for shutdown, when the coroutine scope is about to die. */
+    private fun flushTelemetryBufferBlocking() {
+        if (telemetryBuffer.isEmpty()) return
+        val payload = telemetryBuffer.joinToString(separator = "\n", postfix = "\n")
+        telemetryBuffer.clear()
+        lastTelemetryFlushMs = System.currentTimeMillis()
+        try {
+            java.io.File(getDatabaseDir(applicationContext), "telemetry_samples.jsonl")
+                .appendText(payload)
+        } catch (_: Exception) { /* best-effort; failure is non-fatal */ }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -395,9 +446,12 @@ class PowerWardenService : Service() {
         val isScreenOn = (metrics["isScreenOn"] as? Boolean) ?: true
         val currentMa = Math.abs((metrics["currentMa"] as? Int) ?: 0)
         val temp = (metrics["temperatureCelsius"] as? Double) ?: 30.0
-        // Screen OFF: Standby draw > 450mA indicates a heavy rogue sleep wakelock
-        // Screen ON: Active draw > 1600mA with high thermal load (>=40°C)
-        return (!isScreenOn && currentMa > 450) || (isScreenOn && currentMa > 1600 && temp >= 40.0)
+        // Thresholds come from DrainThresholds so the notification, the anomaly
+        // engine, and the dashboard badge can never disagree about one sample.
+        return (!isScreenOn && currentMa > DrainThresholds.SLEEP_ALERT_MA) ||
+            (isScreenOn &&
+                currentMa > DrainThresholds.ACTIVE_ABSOLUTE_MA &&
+                temp >= DrainThresholds.ACTIVE_CRITICAL_TEMP_C)
     }
 
     private fun startForegroundWithNotification() {
@@ -451,6 +505,16 @@ class PowerWardenService : Service() {
             // Detect plug/unplug transitions immediately (also handled on tick)
             onChargingStateChanged(metrics)
 
+            // Runaway-drain detection lives here, not in the Flutter UI, so it
+            // keeps working when the Activity is gone.
+            anomalyDetector.closeIfSettled(metrics)?.let { closed ->
+                anomalyDetector.persistClosure(closed)
+            }
+            anomalyDetector.evaluate(metrics)?.let { opened ->
+                anomalyDetector.persist(opened)
+                anomalyDetector.alertIfWarranted(opened)
+            }
+
             withContext(Dispatchers.Main) {
                 listener?.invoke(metrics)
             }
@@ -459,7 +523,11 @@ class PowerWardenService : Service() {
             val now = System.currentTimeMillis()
             val isScreenOn = screenObserver.isInteractive()
             // Throttled smart-notification refresh: 4s while awake, 60s asleep.
-            val notificationIntervalMs = if (isScreenOn) 4_000L else 60_000L
+            val notificationIntervalMs = if (isScreenOn) {
+                DrainThresholds.NOTIFICATION_AWAKE_MS
+            } else {
+                DrainThresholds.NOTIFICATION_ASLEEP_MS
+            }
             if (now - lastNotificationUpdateMs >= notificationIntervalMs) {
                 lastNotificationUpdateMs = now
                 updateSmartNotification(metrics)
@@ -469,9 +537,10 @@ class PowerWardenService : Service() {
             val currentDrain = (metrics["currentMa"] as? Int) ?: 0
 
             val nextIntervalMs = when {
-                isScreenOn -> 2_000L // Fast updates when screen is active
-                currentDrain > 350 -> 30_000L // Tighten loop on drain spike
-                else -> 60_000L // Calm idle: relaxed to protect deep sleep
+                isScreenOn -> DrainThresholds.TICK_SCREEN_ON_MS
+                currentDrain > DrainThresholds.SLEEP_ANOMALY_MA ->
+                    DrainThresholds.TICK_DRAIN_SPIKE_MS
+                else -> DrainThresholds.TICK_SLEEP_MS
             }
 
             if (isRunning) {
@@ -506,6 +575,9 @@ class PowerWardenService : Service() {
     override fun onDestroy() {
         isRunning = false
         handler.removeCallbacks(tickerRunnable)
+        // Persist any buffered samples before the scope dies, otherwise up to a
+        // minute of telemetry is lost every time the service stops.
+        flushTelemetryBufferBlocking()
         try {
             unregisterReceiver(powerConnectionReceiver)
         } catch (_: Exception) { /* best-effort; failure is non-fatal */ }

@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'drain_thresholds.dart';
 import 'models/anomaly_incident.dart';
 import 'models/telemetry_sample.dart';
 
@@ -15,14 +16,14 @@ class AnomalyEngine {
 
   // Sliding window of samples
   final List<TelemetrySample> _recentSamples = [];
-  static const int _consecutiveSpikeThreshold = 2; // 2 ticks = 10s
+  static const int _consecutiveSpikeThreshold = DrainThresholds.consecutiveSpikeSamples;
 
   // ── Incident deduplication & resolution ─────────────────────────────
   // One sustained rogue-drain event should produce ONE incident, not one
   // per detection tick. A new incident of the same category is suppressed
   // while the previous one is younger than [incidentCooldown]; the previous
   // incident is closed (endTime set) once drain subsides.
-  static const Duration incidentCooldown = Duration(minutes: 5);
+  static const Duration incidentCooldown = DrainThresholds.incidentCooldown;
   AnomalyIncident? _lastSleepIncident;
   AnomalyIncident? _lastActiveIncident;
 
@@ -34,14 +35,15 @@ class AnomalyEngine {
     if (_lastSleepIncident != null && _lastSleepIncident!.endTime == null) {
       final drainSettled = sample.isCharging ||
           (sample.isScreenOn) ||
-          (sample.currentMilliamps < 280);
+          (sample.currentMilliamps < DrainThresholds.sleepAnomalyMa);
       if (drainSettled) {
         closed = _lastSleepIncident!.copyWith(endTime: sample.timestamp);
         _lastSleepIncident = closed;
       }
     }
     if (_lastActiveIncident != null && _lastActiveIncident!.endTime == null) {
-      final settled = sample.currentMilliamps < 1500 ||
+      final settled =
+          sample.currentMilliamps < DrainThresholds.activeAnomalyMa ||
           sample.temperatureCelsius < 42.0;
       if (settled) {
         final closedActive =
@@ -87,7 +89,7 @@ class AnomalyEngine {
     if (!sample.isScreenOn) {
       if (_recentSamples.length >= _consecutiveSpikeThreshold) {
         final window = _recentSamples.sublist(_recentSamples.length - _consecutiveSpikeThreshold);
-        final allSpiking = window.every((s) => !s.isScreenOn && s.currentMilliamps >= 280);
+        final allSpiking = window.every((s) => !s.isScreenOn && s.currentMilliamps >= DrainThresholds.sleepAnomalyMa);
 
         if (allSpiking) {
           final peakMa = window.map((s) => s.currentMilliamps).reduce(max);
@@ -109,7 +111,9 @@ class AnomalyEngine {
           }
 
           // Critical sleep drain: Screen off but drawing 550mA+ or heating up
-          final isCriticalSleep = peakMa >= 550 || maxTemp >= 38.0;
+          final isCriticalSleep =
+              peakMa >= DrainThresholds.sleepCriticalMa ||
+              maxTemp >= DrainThresholds.sleepCriticalTempC;
 
           // Automated Rulebook Translation (PLANS Phase 3.3)
           String diagnosis = 'Rogue sleep drain ($peakMa mA while screen off). An app or wakelock is preventing deep sleep.';
@@ -158,7 +162,9 @@ class AnomalyEngine {
     // Active screen (120Hz OLED, 5G, CPU) legitimately consumes 400-900mA.
     // Strictly require extreme physical draw (>1,600mA) AND dangerous battery temperature (>= 42°C)
     // to avoid false emergency alarms while user is simply using the phone.
-    if (sample.currentMilliamps >= 1500 && (sample.thermalStatus >= 2 || sample.temperatureCelsius >= 42.0)) {
+    if (sample.currentMilliamps >= DrainThresholds.activeAnomalyMa &&
+        (sample.thermalStatus >= DrainThresholds.thermalModerate ||
+            sample.temperatureCelsius >= 42.0)) {
       // Dedup: one incident per sustained thermal event
       final last = _lastActiveIncident;
       final withinCooldown = last != null &&

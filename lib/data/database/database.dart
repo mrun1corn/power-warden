@@ -9,10 +9,17 @@ import '../../domain/models/anomaly_incident.dart';
 import '../../domain/models/power_session.dart';
 import '../../domain/models/telemetry_sample.dart';
 
-/// Lightweight, zero-code-gen Local Persistence Engine.
-/// Stores telemetry samples, anomaly incidents, and power sessions with in-memory ring-buffer batching (every 15 min),
-/// preventing continuous flash I/O wakes and pruning raw telemetry older than 7 days.
-/// NOTE: Sessions & incidents are NEVER pruned — only high-frequency raw ticks.
+/// Read-only local persistence reader for PowerWarden.
+///
+/// **Ownership rule:** `PowerWardenService` (Kotlin) is the single writer for
+/// every store — `telemetry_samples.jsonl`, `power_sessions.jsonl` and
+/// `anomaly_incidents.jsonl`. This class only reads them, plus prunes expired
+/// raw telemetry.
+///
+/// This split exists because the previous design had the Flutter dashboard and
+/// the foreground service both appending to the same files, which duplicated
+/// every session and every telemetry sample. Two writers, one file, no
+/// coordination.
 class AppDatabase {
   static final AppDatabase _instance = AppDatabase._internal();
   factory AppDatabase() => _instance;
@@ -22,12 +29,10 @@ class AppDatabase {
   File? _anomaliesFile;
   File? _sessionsFile;
 
-  final List<TelemetrySample> _memoryBuffer = [];
-  Timer? _flushTimer;
   Timer? _pruneTimer;
 
-  static const int maxBufferSize = 30;
-  static const Duration flushInterval = Duration(minutes: 15);
+  /// Raw telemetry ticks are retained for a week; sessions and incidents are
+  /// kept indefinitely because they are the user-visible history.
   static const Duration retentionPeriod = Duration(days: 7);
 
   Future<void> initialize() async {
@@ -46,216 +51,158 @@ class AppDatabase {
   }
 
   void startPeriodicTasks() {
-    _flushTimer?.cancel();
-    _flushTimer = Timer.periodic(flushInterval, (_) => flushBuffer());
-
     _pruneTimer?.cancel();
-    _pruneTimer = Timer.periodic(const Duration(hours: 6), (_) => pruneOldTelemetry());
+    _pruneTimer = Timer.periodic(
+      const Duration(hours: 6),
+      (_) => pruneOldTelemetry(),
+    );
   }
 
   void stopPeriodicTasks() {
-    _flushTimer?.cancel();
-    _flushTimer = null;
     _pruneTimer?.cancel();
     _pruneTimer = null;
   }
 
-  /// Appends sample to in-memory buffer. Flushes if buffer reaches capacity (5 samples).
-  Future<void> bufferSample(TelemetrySample sample) async {
-    _memoryBuffer.add(sample);
-    if (_memoryBuffer.length >= 3) {
-      await flushBuffer();
-    }
-  }
-
-  /// Flushes in-memory samples to disk in a single batched operation.
-  Future<void> flushBuffer() async {
-    if (_memoryBuffer.isEmpty || _telemetryFile == null) return;
-
-    final toFlush = List<TelemetrySample>.from(_memoryBuffer);
-    _memoryBuffer.clear();
-
-    final buffer = StringBuffer();
-    for (final s in toFlush) {
-      buffer.writeln(jsonEncode(s.toMap()));
-    }
-
-    try {
-      await _telemetryFile!.writeAsString(buffer.toString(), mode: FileMode.append, flush: true);
-    } catch (_) {}
-  }
-
-  /// Saves an anomaly incident to persistent storage immediately.
-  Future<void> recordAnomaly(AnomalyIncident incident) async {
-    if (_anomaliesFile == null) return;
-    try {
-      await _anomaliesFile!.writeAsString(
-        '${jsonEncode(incident.toMap())}\n',
-        mode: FileMode.append,
-        flush: true,
-      );
-    } catch (_) {}
-  }
-
-  /// Updates an existing incident in place (e.g. closing endTime, peak refresh).
-  /// Rewrites the anomalies file, matching records by startTime + open state.
-  Future<void> updateAnomaly(AnomalyIncident updated) async {
-    if (_anomaliesFile == null || !await _anomaliesFile!.exists()) return;
-    try {
-      final lines = await _anomaliesFile!.readAsLines();
-      final out = <String>[];
-      var replaced = false;
-      for (final line in lines) {
-        if (line.trim().isEmpty) continue;
-        try {
-          final map = jsonDecode(line) as Map<String, dynamic>;
-          final sameStart = (map['startTime'] as int) ==
-              updated.startTime.millisecondsSinceEpoch;
-          final stillOpen = map['endTime'] == null;
-          if (!replaced && sameStart && stillOpen) {
-            out.add(jsonEncode(updated.toMap()));
-            replaced = true;
-          } else {
-            out.add(line);
-          }
-        } catch (_) {
-          out.add(line);
-        }
-      }
-      await _anomaliesFile!.writeAsString(
-        out.isEmpty ? '' : '${out.join('\n')}\n',
-        flush: true,
-      );
-    } catch (_) {}
-  }
-
-  /// Retrieves recorded anomaly incidents for the Sentinel log.
-  Future<List<AnomalyIncident>> getRecentAnomalies({int limit = 50}) async {
-    final results = <AnomalyIncident>[];
-    if (_anomaliesFile != null && await _anomaliesFile!.exists()) {
-      try {
-        final lines = await _anomaliesFile!.readAsLines();
-        for (final line in lines.reversed) {
-          if (line.trim().isEmpty) continue;
-          try {
-            final map = jsonDecode(line) as Map<String, dynamic>;
-            results.add(AnomalyIncident.fromMap(map));
-            if (results.length >= limit) break;
-          } catch (_) {}
-        }
-      } catch (_) {}
-    }
-    return results;
-  }
-
-  /// Saves a charging or discharging session to history.
-  Future<void> recordPowerSession(PowerSession session) async {
-    if (_sessionsFile == null) return;
-    try {
-      await _sessionsFile!.writeAsString(
-        '${jsonEncode(session.toMap())}\n',
-        mode: FileMode.append,
-        flush: true,
-      );
-    } catch (_) {}
-  }
-
-  /// Retrieves recorded historical power sessions.
+  /// Retrieves recorded historical power sessions, newest first.
   Future<List<PowerSession>> getRecentSessions({int limit = 40}) async {
     final results = <PowerSession>[];
-    if (_sessionsFile != null && await _sessionsFile!.exists()) {
-      try {
-        final lines = await _sessionsFile!.readAsLines();
-        for (final line in lines.reversed) {
-          if (line.trim().isEmpty) continue;
-          try {
-            final map = jsonDecode(line) as Map<String, dynamic>;
-            results.add(PowerSession.fromMap(map));
-            if (results.length >= limit) break;
-          } catch (_) {}
+    final file = _sessionsFile;
+    if (file == null || !await file.exists()) return results;
+
+    try {
+      final lines = await file.readAsLines();
+      for (final line in lines.reversed) {
+        if (line.trim().isEmpty) continue;
+        final session = _tryDecode(line, PowerSession.fromMap);
+        if (session != null) {
+          results.add(session);
+          if (results.length >= limit) break;
         }
-      } catch (_) {}
+      }
+    } catch (_) {
+      // Unreadable store degrades to an empty history rather than a crash.
     }
     return results;
   }
 
-  /// Prunes raw telemetry ticks older than 7 days to conserve disk space.
-  /// Sessions and incidents are retained indefinitely.
+  /// Retrieves recorded anomaly incidents, newest first.
+  Future<List<AnomalyIncident>> getRecentAnomalies({int limit = 50}) async {
+    final results = <AnomalyIncident>[];
+    final file = _anomaliesFile;
+    if (file == null || !await file.exists()) return results;
+
+    try {
+      final lines = await file.readAsLines();
+      for (final line in lines.reversed) {
+        if (line.trim().isEmpty) continue;
+        final incident = _tryDecode(line, AnomalyIncident.fromMap);
+        if (incident != null) {
+          results.add(incident);
+          if (results.length >= limit) break;
+        }
+      }
+    } catch (_) {}
+    return results;
+  }
+
+  /// Prunes raw telemetry ticks older than [retentionPeriod].
+  ///
+  /// Pruning is the only write this class performs, and it only ever *removes*
+  /// records — it cannot duplicate a sample written by the service.
   Future<void> pruneOldTelemetry() async {
-    if (_telemetryFile == null || !await _telemetryFile!.exists()) return;
+    final file = _telemetryFile;
+    if (file == null || !await file.exists()) return;
 
     try {
       final cutoff = DateTime.now().subtract(retentionPeriod);
-      final lines = await _telemetryFile!.readAsLines();
+      final lines = await file.readAsLines();
       final retained = <String>[];
 
       for (final line in lines) {
         if (line.trim().isEmpty) continue;
         try {
           final map = jsonDecode(line) as Map<String, dynamic>;
-          final timestamp = DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int);
-          if (timestamp.isAfter(cutoff)) {
-            retained.add(line);
-          }
-        } catch (_) {}
+          final timestamp = DateTime.fromMillisecondsSinceEpoch(
+            map['timestamp'] as int,
+          );
+          if (timestamp.isAfter(cutoff)) retained.add(line);
+        } catch (_) {
+          // Drop corrupt lines rather than retaining them forever.
+        }
       }
 
-      await _telemetryFile!.writeAsString(
+      await file.writeAsString(
         retained.isEmpty ? '' : '${retained.join('\n')}\n',
         flush: true,
       );
     } catch (_) {}
   }
 
-  /// Retrieves recent telemetry samples for timeline visualization.
+  /// Retrieves the most recent telemetry samples, oldest first.
   Future<List<TelemetrySample>> getRecentTelemetry({int limit = 100}) async {
     final results = <TelemetrySample>[];
-    results.addAll(_memoryBuffer);
+    final file = _telemetryFile;
+    if (file == null || !await file.exists()) return results;
 
-    if (_telemetryFile != null && await _telemetryFile!.exists()) {
-      try {
-        final lines = await _telemetryFile!.readAsLines();
-        for (final line in lines.reversed) {
-          if (line.trim().isEmpty) continue;
-          try {
-            final map = jsonDecode(line) as Map<String, dynamic>;
-            results.add(TelemetrySample.fromMap(map));
-            if (results.length >= limit) break;
-          } catch (_) {}
+    try {
+      final lines = await file.readAsLines();
+      for (final line in lines.reversed) {
+        if (line.trim().isEmpty) continue;
+        final sample = _tryDecode(line, TelemetrySample.fromMap);
+        if (sample != null) {
+          results.add(sample);
+          if (results.length >= limit) break;
         }
-      } catch (_) {}
-    }
+      }
+    } catch (_) {}
 
     results.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return results;
   }
 
-  /// Retrieves telemetry samples for a specific session window, regardless of
-  /// how old they are — keeps session detail charts populated even after the
-  /// last-100-lines ring buffer has rolled over.
+  /// Retrieves telemetry samples inside a session window, oldest first.
+  ///
+  /// Scans the whole store rather than a tail window so session detail charts
+  /// stay populated after the recent-sample buffer has rolled over.
   Future<List<TelemetrySample>> getTelemetryForSession(
     DateTime startTime,
     DateTime endTime, {
     int limit = 200,
   }) async {
     final results = <TelemetrySample>[];
-    if (_telemetryFile != null && await _telemetryFile!.exists()) {
-      try {
-        final lines = await _telemetryFile!.readAsLines();
-        for (final line in lines) {
-          if (line.trim().isEmpty) continue;
-          try {
-            final map = jsonDecode(line) as Map<String, dynamic>;
-            final ts = DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int);
-            if (!ts.isBefore(startTime) && !ts.isAfter(endTime)) {
-              results.add(TelemetrySample.fromMap(map));
-              if (results.length >= limit) break;
-            }
-          } catch (_) {}
-        }
-      } catch (_) {}
-    }
+    final file = _telemetryFile;
+    if (file == null || !await file.exists()) return results;
+
+    try {
+      final lines = await file.readAsLines();
+      for (final line in lines) {
+        if (line.trim().isEmpty) continue;
+        try {
+          final map = jsonDecode(line) as Map<String, dynamic>;
+          final ts = DateTime.fromMillisecondsSinceEpoch(
+            map['timestamp'] as int,
+          );
+          if (!ts.isBefore(startTime) && !ts.isAfter(endTime)) {
+            results.add(TelemetrySample.fromMap(map));
+            if (results.length >= limit) break;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
     results.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return results;
+  }
+
+  /// Decodes one JSONL line, returning null for corrupt records instead of
+  /// aborting the whole read — a single bad line used to silently truncate the
+  /// entire history.
+  T? _tryDecode<T>(String line, T Function(Map<String, dynamic>) fromMap) {
+    try {
+      final map = jsonDecode(line) as Map<String, dynamic>;
+      return fromMap(map);
+    } catch (_) {
+      return null;
+    }
   }
 }

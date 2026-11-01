@@ -51,12 +51,12 @@ graph TD
 ## 🚀 Key Features
 
 * **Real-time Discharge Current Meter:** Direct read of instantaneous milliampere consumption ($mA$) with auto-calibrated vendor unit/sign detection.
-* **Screen-off Drain Sentinel:** Monitors battery drop rate specifically while the device is sleeping. If drain exceeds $500mA$ continuously or $>4\%/hr$ while the screen is off, a high-severity alert is dispatched.
+* **Screen-off Drain Sentinel:** Monitors battery drop rate specifically while the device is sleeping. Thresholds live in one place (`DrainThresholds.kt` / `drain_thresholds.dart`): sleep drain at or above $280mA$ across two consecutive samples raises an incident, $550mA$ or $38^\circ C$ escalates it to critical, and only critical incidents notify.
 * **Thermal Corroborator:** Correlates unexpected discharge spikes with thermal throttling states (`THERMAL_STATUS_MODERATE`, `SEVERE`) to filter out false positives.
 * **Rootless Deep Inspection (Shizuku & Kadb):** Extracts thread-level CPU usage and unreleased partial wakelocks without a PC or root permissions.
 * **Differential Snapshotting:** Compares 5-10 second CPU/wakelock deltas at the moment of spike to find what's active right now, rather than cumulative stats.
 * **Actionable Remediation:** One-tap action to force-stop or background-restrict rogue apps, or recommend reboots for stuck kernel/system loops.
-* **Adaptive Zero-Wake Budget:** Relies on inexact alarms and in-memory batching ($<0.2\%$ battery overhead per 24h).
+* **Detection Survives The UI:** The anomaly engine, incident log and alerting all run inside the foreground service, so closing the app does not stop monitoring.
 
 ---
 

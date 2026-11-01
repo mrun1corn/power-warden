@@ -4,12 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../core/action_guard.dart';
-import '../domain/anomaly_engine.dart';
-import '../domain/models/anomaly_incident.dart';
-import '../domain/models/power_session.dart';
+import '../domain/drain_thresholds.dart';
 import '../domain/models/telemetry_sample.dart';
 import '../data/database/database.dart';
-import '../services/notification_service.dart';
 import '../services/telemetry_service.dart';
 import 'theme.dart';
 import 'widgets/drain_timeline_chart.dart';
@@ -24,13 +21,10 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final TelemetryService _telemetryService = TelemetryService();
-  final AnomalyEngine _anomalyEngine = AnomalyEngine();
-  final NotificationService _notificationService = NotificationService();
   final AppDatabase _database = AppDatabase();
 
   TelemetrySample? _currentSample;
   final List<TelemetrySample> _history = [];
-  final List<AnomalyIncident> _incidents = [];
   int _capacityMah = 4500; // calibrated from CHARGE_COUNTER at startup
 
   StreamSubscription<TelemetrySample>? _streamSub;
@@ -48,15 +42,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool _dismissedNightStandby = false;
 
-  // Session History Tracking
-  DateTime? _sessionStartTime;
-  int? _sessionStartLevel;
-  bool? _sessionIsCharging;
-  int _peakMaInSession = 0;
-  double _peakWattsInSession = 0.0;
-  double _minTempInSession = 99.0;
-  double _maxTempInSession = 0.0;
-
   @override
   void initState() {
     super.initState();
@@ -64,21 +49,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _initApp() async {
-    await _notificationService.initialize();
     await _database.initialize();
 
     // Calibrate battery capacity from CHARGE_COUNTER (falls back to 4500)
     _capacityMah = await _telemetryService.getCapacityMah();
 
-    // Load saved historical samples and anomalies from disk
+    // Read-only view: the foreground service owns every write to disk
+    // (telemetry samples, sessions, incidents). See PowerWardenService.
     final savedSamples = await _database.getRecentTelemetry(limit: 60);
     if (savedSamples.isNotEmpty) {
       _history.addAll(savedSamples);
-    }
-
-    final savedAnomalies = await _database.getRecentAnomalies(limit: 20);
-    if (savedAnomalies.isNotEmpty) {
-      _incidents.addAll(savedAnomalies);
     }
 
     _elevatedStatus = await _telemetryService.getElevatedStatus();
@@ -103,143 +83,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     });
 
-    // Listen to live stream
+    // Listen to live stream. Analysis, incident logging and alerting all run
+    // natively inside PowerWardenService so they survive this Activity.
     _streamSub = _telemetryService.telemetryStream.listen((sample) {
-      _processSessionTracking(sample);
+      if (!mounted) return;
       setState(() {
         _currentSample = sample;
         _history.add(sample);
         if (_history.length > 60) _history.removeAt(0);
-
-        _database.bufferSample(sample);
-
-        final incident = _anomalyEngine.evaluateSample(
-          sample,
-          topProcess: _topProcesses.isNotEmpty ? _topProcesses.first : null,
-        );
-
-        // Close any open incident once drain subsides (sets endTime)
-        final closed = _anomalyEngine.resolveOpenIncidents(sample);
-        if (closed != null) {
-          final idx = _incidents.indexWhere((i) =>
-              i.startTime == closed.startTime && i.endTime == null);
-          if (idx >= 0) {
-            _incidents[idx] = closed;
-            _database.updateAnomaly(closed);
-          }
-        }
-
-        if (incident != null) {
-          _incidents.insert(0, incident);
-          _database.recordAnomaly(incident);
-
-          // Trigger differential snapshotting if elevated access is active
-          if (_elevatedStatus['hasAnyElevatedAccess'] == true) {
-            _telemetryService.runDeltaDiagnostics();
-          }
-
-          if (_anomalyEngine.shouldAlertNotification(incident)) {
-            final topApp = _topProcesses.isNotEmpty
-                ? _topProcesses.first
-                : null;
-            final topName = topApp?['name'] as String?;
-            final topCpu = (topApp?['cpuPercent'] as num?)?.toDouble();
-
-            _notificationService.showAnomalyNotification(
-              incident,
-              topAppName: topName,
-              topAppCpu: topCpu,
-            );
-          }
-        }
       });
     });
 
     if (mounted) {
       setState(() {});
-      _checkElevatedWarning();
     }
-  }
-
-  void _processSessionTracking(TelemetrySample sample) {
-    final now = DateTime.now();
-    final absMa = sample.currentMilliamps.abs();
-    final watts = (sample.voltageMv / 1000.0) * (absMa / 1000.0);
-
-    if (_sessionIsCharging == null) {
-      _sessionIsCharging = sample.isCharging;
-      _sessionStartTime = now;
-      _sessionStartLevel = sample.batteryLevel;
-      _peakMaInSession = absMa;
-      _peakWattsInSession = watts;
-      _minTempInSession = sample.temperatureCelsius;
-      _maxTempInSession = sample.temperatureCelsius;
-      return;
-    }
-
-    // Check if charging state changed (e.g. plugged in or unplugged)
-    if (_sessionIsCharging != sample.isCharging) {
-      final startTime = _sessionStartTime;
-      final duration = startTime != null ? now.difference(startTime) : Duration.zero;
-
-      // Save valid charging or discharging sessions (must run >= 2 minutes
-      // AND show >= 1% battery change — filters out transient spikes and
-      // 1-minute/1% noise that cluttered history).
-      final startLvl = _sessionStartLevel ?? sample.batteryLevel;
-      final deltaPercent = (sample.batteryLevel - startLvl).abs();
-
-      if (duration.inSeconds >= 120 && deltaPercent >= 1) {
-        final mahDelta = math.max(15, ((deltaPercent / 100.0) * _capacityMah).round());
-        final topApp = _topProcesses.isNotEmpty
-            ? (_topProcesses.first['name'] as String? ?? '')
-            : '';
-
-        final session = PowerSession(
-          id: now.millisecondsSinceEpoch.toString(),
-          type: _sessionIsCharging! ? 'charging' : 'discharging',
-          startTime: startTime ?? now.subtract(duration),
-          endTime: now,
-          startBatteryLevel: startLvl,
-          endBatteryLevel: sample.batteryLevel,
-          totalMahDelta: mahDelta,
-          peakMa: _peakMaInSession,
-          peakWatts: _peakWattsInSession,
-          minTempCelsius: _minTempInSession,
-          maxTempCelsius: _maxTempInSession,
-          topAppName: topApp,
-        );
-
-        _database.recordPowerSession(session);
-      }
-
-      // Reset for new session
-      _sessionIsCharging = sample.isCharging;
-      _sessionStartTime = now;
-      _sessionStartLevel = sample.batteryLevel;
-      _peakMaInSession = absMa;
-      _peakWattsInSession = watts;
-      _minTempInSession = sample.temperatureCelsius;
-      _maxTempInSession = sample.temperatureCelsius;
-    } else {
-      // Accumulate peak stats
-      if (absMa > _peakMaInSession) {
-        _peakMaInSession = absMa;
-      }
-      if (watts > _peakWattsInSession) {
-        _peakWattsInSession = watts;
-      }
-      if (sample.temperatureCelsius < _minTempInSession) {
-        _minTempInSession = sample.temperatureCelsius;
-      }
-      if (sample.temperatureCelsius > _maxTempInSession) {
-        _maxTempInSession = sample.temperatureCelsius;
-      }
-    }
-  }
-
-  Future<void> _checkElevatedWarning() async {
-    // Suppressed: Using inline non-intrusive banner instead of modal dialog
-    return;
   }
 
   @override
@@ -1159,7 +1016,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       statusBadge = 'CHARGING';
     } else if (!isScreenOn) {
       // Standby / Screen-off thresholds
-      if (absMa > 350) {
+      if (absMa > DrainThresholds.sleepAnomalyMa) {
         statusColor = isDark ? AppTheme.crimson : AppTheme.crimsonLight;
         statusBadge = 'WAKELOCK DRAIN';
       } else if (absMa > 150) {
@@ -1171,10 +1028,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } else {
       // Screen ON active display (nominal 400-900mA for 120Hz LTPO panels)
-      if (absMa > 1400 || (absMa > 1200 && sample.temperatureCelsius >= 40.0)) {
+      if (absMa > DrainThresholds.activeCriticalMa ||
+          (absMa > 1200 &&
+              sample.temperatureCelsius >= DrainThresholds.activeCriticalTempC)) {
         statusColor = isDark ? AppTheme.crimson : AppTheme.crimsonLight;
         statusBadge = 'CRITICAL DRAIN';
-      } else if (absMa > 950) {
+      } else if (absMa > DrainThresholds.activeHeavyMa) {
         statusColor = isDark ? AppTheme.amber : AppTheme.amberLight;
         statusBadge = 'HEAVY LOAD';
       } else {

@@ -116,7 +116,32 @@ Emits real-time hardware samples every tick:
 ## Power Budget Strategy
 
 To ensure PowerWarden does not contribute to the drain it is monitoring:
-1. **Adaptive Zero-Wake:** Back off completely during calm idle (15–60mA). Only tighten sampling when a drain or thermal threshold triggers.
+1. **Adaptive Zero-Wake:** 2 s ticks while the screen is on, 30 s during a sleep drain spike, 60 s when calm idle.
 2. **Zero Continuous Wakelocks:** Never hold `PARTIAL_WAKE_LOCK`. Let the Linux kernel deep sleep (`suspend`).
-3. **Batch Persistence:** In-memory ring buffer flushed to SQLite in a single transaction once every 15 minutes.
+3. **Single Writer + Batch Persistence:** `PowerWardenService` is the only writer of every JSONL store. Telemetry is buffered and flushed at 10 samples or 60 s, and drained synchronously on shutdown. The Flutter layer is read-only (plus 7-day telemetry pruning).
 4. **Execution Budget:** Hardware telemetry sample completes in $\le 10\text{ ms}$ of CPU time.
+
+---
+
+## Detection Ownership
+
+Runaway-drain detection runs **inside the foreground service** (`AnomalyDetector`),
+not in the Flutter UI. Analysis, incident dedupe, incident persistence and alert
+rate-limiting therefore survive the Activity being closed or destroyed. The UI
+only renders state read back from disk.
+
+## Threshold Single Source Of Truth
+
+All drain thresholds live in
+`android/app/src/main/kotlin/com/mrun1corn/powerwarden/service/DrainThresholds.kt`
+with a Dart mirror at `lib/domain/drain_thresholds.dart`. The service, the
+detector and the dashboard badge all read from them, so the app cannot report
+two different verdicts for the same sample.
+
+## Current Sign Contract
+
+`BatteryProbe.normalizeCurrent` guarantees **positive mA = discharging**,
+negative = charging. Direction is derived from the framework charger state, never
+from the raw sensor sign (kernels disagree). Both `BatteryProbeNormalizeCurrentTest`
+(Kotlin) and `current_sign_contract_test.dart` (Dart) assert this, because a
+polarity regression silently disables every threshold comparison.

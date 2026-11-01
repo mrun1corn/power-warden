@@ -7,8 +7,10 @@ import 'package:flutter/services.dart';
 import '../../core/action_guard.dart';
 import '../../core/formatters.dart';
 import '../../data/database/database.dart';
+import '../../domain/drain_thresholds.dart';
 import '../../domain/models/power_session.dart';
 import '../../domain/models/telemetry_sample.dart';
+import '../../domain/session_noise_filter.dart';
 import '../../services/telemetry_service.dart';
 import 'session_detail_screen.dart';
 import 'theme.dart';
@@ -88,22 +90,33 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
   }
 
-  /// Filters sessions by the selected aggregation range.
+  /// Filters sessions by the selected aggregation range, then drops noise.
+  ///
+  /// The noise floor is applied at read time (not just at write time) so
+  /// records already persisted by older builds disappear from History instead
+  /// of lingering forever — sessions are never pruned from disk.
   List<PowerSession> _rangeFiltered(List<PowerSession> sessions) {
     final now = DateTime.now();
+    final meaningful = sessions.where(_isMeaningfulSession);
     switch (_range) {
       case _HistoryRange.day:
-        return sessions
+        return meaningful
             .where((s) => now.difference(s.startTime).inDays < 1)
             .toList();
       case _HistoryRange.week:
-        return sessions
+        return meaningful
             .where((s) => now.difference(s.startTime).inDays < 7)
             .toList();
       case _HistoryRange.all:
-        return sessions;
+        return meaningful.toList();
     }
   }
+
+  /// A history entry is worth showing only if it ran long enough and actually
+  /// moved the battery. Shared with the Kotlin writer's rules via
+  /// [SessionNoiseFilter] so read-time and write-time agree.
+  bool _isMeaningfulSession(PowerSession session) =>
+      SessionNoiseFilter.isMeaningful(session);
 
   /// Opens the full-screen detail view for a completed session.
   /// Queries session-scoped telemetry from disk so charts stay populated even
@@ -281,57 +294,80 @@ class _HistoryScreenState extends State<HistoryScreen>
     final activeMatchingSamples = _historicalSamples
         .where((s) => isChargingTab ? s.isCharging : !s.isCharging)
         .toList();
+    // The live card is only meaningful once the in-progress cycle has run for a
+    // while. Previously two consecutive samples (4 s) were enough, so opening
+    // the app flashed a "Live Session" card with a 4-second duration.
+    final liveStart = activeMatchingSamples.isEmpty
+        ? null
+        : activeMatchingSamples.first.timestamp;
+    final liveElapsed = liveStart == null
+        ? Duration.zero
+        : DateTime.now().difference(liveStart);
     final isLiveNow = activeMatchingSamples.length >= 2 &&
         _historicalSamples.isNotEmpty &&
-        (isChargingTab ? _historicalSamples.last.isCharging : !_historicalSamples.last.isCharging);
+        (isChargingTab
+            ? _historicalSamples.last.isCharging
+            : !_historicalSamples.last.isCharging) &&
+        liveElapsed >= DrainThresholds.minLiveCardDuration;
 
-    // Fallback: If no sessions recorded yet, reconstruct session from recent historical samples
     final effectiveSessions = List<PowerSession>.from(sessions);
 
     // When a live session is showing, hide any DB-recorded session that
     // overlaps the live window so the same drain/charge cycle isn't listed twice.
-    if (isLiveNow && _historicalSamples.isNotEmpty) {
-      final liveStart = _historicalSamples.first.timestamp;
-      effectiveSessions.removeWhere((s) =>
-          s.startTime.isAfter(liveStart.subtract(const Duration(minutes: 2))));
+    if (isLiveNow && liveStart != null) {
+      effectiveSessions.removeWhere(
+        (s) => s.startTime.isAfter(liveStart.subtract(const Duration(minutes: 2))),
+      );
     }
 
+    // Fallback: no persisted session yet, but the recent telemetry window may
+    // contain one long enough to be worth showing. Previously this fired on any
+    // two samples (4 s) and built a session with start/end reversed.
     if (effectiveSessions.isEmpty && _historicalSamples.isNotEmpty) {
       final matchingSamples = _historicalSamples
           .where((s) => isChargingTab ? s.isCharging : !s.isCharging)
           .toList();
       if (matchingSamples.length >= 2) {
-        final first = matchingSamples.last;
-        final last = matchingSamples.first;
-        final delta = (last.batteryLevel - first.batteryLevel).abs();
-        final maxCur = matchingSamples
-            .map((s) => s.currentMilliamps.abs())
-            .reduce(math.max);
-        final minT = matchingSamples
-            .map((s) => s.temperatureCelsius)
-            .reduce(math.min);
-        final maxT = matchingSamples
-            .map((s) => s.temperatureCelsius)
-            .reduce(math.max);
+        // `getRecentTelemetry` returns oldest-first.
+        final oldest = matchingSamples.first;
+        final newest = matchingSamples.last;
+        final span = newest.timestamp.difference(oldest.timestamp);
+        final delta = (newest.batteryLevel - oldest.batteryLevel).abs();
 
-        effectiveSessions.add(
-          PowerSession(
-            id: 'synthesized_recent',
-            type: isChargingTab ? 'charging' : 'discharging',
-            startTime: first.timestamp,
-            endTime: last.timestamp,
-            startBatteryLevel: first.batteryLevel,
-            endBatteryLevel: last.batteryLevel,
-            totalMahDelta: math.max(10, ((delta / 100.0) * _capacityMah).round()),
-            peakMa: maxCur,
-            peakWatts: (last.voltageMv / 1000.0) * (maxCur / 1000.0),
-            minTempCelsius: minT,
-            maxTempCelsius: maxT,
-            topAppName: _appUsageList.isNotEmpty
-                ? (_appUsageList.first['name'] as String? ?? '')
-                : '',
-          ),
-        );
+        // Only synthesize a card for a window that clears the same noise floor
+        // the persisted sessions use.
+        if (span >= DrainThresholds.minSessionDuration &&
+            delta >= DrainThresholds.minSessionDeltaPercent) {
+          final maxCur = matchingSamples
+              .map((s) => s.currentMilliamps.abs())
+              .reduce(math.max);
+          final minT = matchingSamples
+              .map((s) => s.temperatureCelsius)
+              .reduce(math.min);
+          final maxT = matchingSamples
+              .map((s) => s.temperatureCelsius)
+              .reduce(math.max);
+
+          effectiveSessions.add(
+            PowerSession(
+              id: 'synthesized_recent',
+              type: isChargingTab ? 'charging' : 'discharging',
+              startTime: oldest.timestamp,
+              endTime: newest.timestamp,
+              startBatteryLevel: oldest.batteryLevel,
+              endBatteryLevel: newest.batteryLevel,
+              totalMahDelta:
+                  math.max(10, ((delta / 100.0) * _capacityMah).round()),
+              peakMa: maxCur,
+              peakWatts: (newest.voltageMv / 1000.0) * (maxCur / 1000.0),
+              minTempCelsius: minT,
+              maxTempCelsius: maxT,
+              topAppName: _appUsageList.isNotEmpty
+                  ? (_appUsageList.first['name'] as String? ?? '')
+                  : '',
+            ),
+          );
+        }
       }
     }
 
@@ -772,12 +808,20 @@ class _HistoryScreenState extends State<HistoryScreen>
     // 1. First retrieve all full standby sessions recorded natively or in database
     final standbySessions = _allSessions.where((s) => s.type == 'standby').toList();
 
-    // 2. Combine with historical telemetry sleep samples
+    // 2. Combine with historical telemetry sleep samples.
+    //    Filter at the same 10-minute floor used when recording standby
+    //    sessions — a 30-second screen-off gap is not a sleep interval.
     final sleepSamples = _historicalSamples
-        .where((s) => s.sleepDurationMs > (1000 * 30))
+        .where((s) =>
+            s.sleepDurationMs >= DrainThresholds.minStandbyDuration.inMilliseconds)
         .toList();
 
-    if (standbySessions.isEmpty && sleepSamples.isEmpty) {
+    // 3. Legacy records already on disk may predate the noise floor.
+    final meaningfulStandby =
+        standbySessions.where(_isMeaningfulSession).toList();
+    final standbyList = meaningfulStandby;
+
+    if (standbyList.isEmpty && sleepSamples.isEmpty) {
       return _buildEmptyState(
         icon: Icons.nightlight_round,
         title: 'No standby sleep intervals detected yet',
@@ -787,14 +831,14 @@ class _HistoryScreenState extends State<HistoryScreen>
       );
     }
 
-    final totalCount = standbySessions.length + sleepSamples.length;
+    final totalCount = standbyList.length + sleepSamples.length;
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: totalCount,
       itemBuilder: (context, index) {
-        if (index < standbySessions.length) {
-          final session = standbySessions[index];
+        if (index < standbyList.length) {
+          final session = standbyList[index];
           final absMa = session.peakMa.abs();
           final idleBurnRate = ((absMa / _capacityMah) * 100.0).toStringAsFixed(1);
           final durationLabel = session.formattedDuration;
@@ -933,7 +977,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           );
         }
 
-        final sampleIndex = index - standbySessions.length;
+        final sampleIndex = index - standbyList.length;
         final sample = sleepSamples[sampleIndex];
         final sleepDuration = Duration(milliseconds: sample.sleepDurationMs);
         final durationLabel = PowerFormatters.duration(sleepDuration);

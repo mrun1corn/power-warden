@@ -73,4 +73,6 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("dev.rikka.tools.refine:runtime:4.4.0")
     implementation("com.flyfishxu:kadb:2.1.3")
+
+    testImplementation("junit:junit:4.13.2")
 }
